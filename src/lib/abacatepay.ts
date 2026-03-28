@@ -79,7 +79,7 @@ export interface CreateCustomerResponse {
 // ─── Billing (cobranças/checkout) ────────────────────────────────────────────
 
 export type BillingFrequency = "ONE_TIME" | "MULTIPLE_PAYMENTS";
-export type BillingMethod = "PIX";
+export type BillingMethod = "PIX" | "CARD";
 export type BillingStatus = "PENDING" | "EXPIRED" | "CANCELLED" | "PAID" | "REFUNDED";
 
 export interface BillingProduct {

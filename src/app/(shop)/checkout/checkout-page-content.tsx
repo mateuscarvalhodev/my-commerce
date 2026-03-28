@@ -42,9 +42,9 @@ const PAYMENT_METHODS: {
   },
   {
     value: "billing",
-    label: "Link de pagamento",
+    label: "Cartão de crédito / PIX",
     icon: CreditCard,
-    description: "Página segura do AbacatePay",
+    description: "Checkout seguro com cartão ou PIX",
   },
 ];
 

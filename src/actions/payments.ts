@@ -112,7 +112,7 @@ export async function createPayment(data: {
 
     const billingRes = await createBilling({
       frequency: "ONE_TIME",
-      methods: ["PIX"],
+      methods: ["PIX", "CARD"],
       products,
       returnUrl: `${siteUrl}/account/orders`,
       completionUrl,
