@@ -81,17 +81,20 @@ export async function createPayment(data: {
       metadata: { order_id: order.id },
     });
 
-    const pix: AbacatePixQrCode = pixRes.data;
+    // v1 may return data nested or at top level
+    const pix = (pixRes as any).data ?? pixRes;
+
+    console.log("[AbacatePay] PIX response:", JSON.stringify(pix, null, 2));
 
     paymentRecord = {
       ...paymentRecord,
       method: "pix",
       status: pix.status === "PAID" ? "paid" : "waiting_payment",
-      gateway_id: pix.id,
-      gateway_status: pix.status,
-      pix_qr_code: pix.brCode,
-      pix_qr_code_url: pix.qrCodeUrl ?? null,
-      pix_expires_at: pix.expiresAt ?? null,
+      gateway_id: pix.id ?? pix.correlationID ?? null,
+      gateway_status: pix.status ?? "PENDING",
+      pix_qr_code: pix.brCode ?? pix.br_code ?? null,
+      pix_qr_code_url: pix.qrCodeImage ?? pix.qrCodeUrl ?? pix.qr_code_url ?? null,
+      pix_expires_at: pix.expiresAt ?? pix.expires_at ?? null,
       gateway_response: pixRes as unknown as Record<string, unknown>,
     };
   } else {
