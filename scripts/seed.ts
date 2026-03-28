@@ -127,17 +127,17 @@ async function seed() {
     console.log("📂 Criando categorias...");
 
     const { data: parents } = await supabase.from("categories").insert([
-      { name: "Notebooks", description: "Computadores portáteis de alto desempenho" },
-      { name: "Monitores", description: "Telas de alta definição para jogos e trabalho" },
-      { name: "Periféricos", description: "Acessórios como teclados, mouses e controles" },
-      { name: "Headsets", description: "Fones de ouvido com microfone para imersão total" },
+      { name: "Notebooks", slug: "notebooks", description: "Computadores portáteis de alto desempenho" },
+      { name: "Monitores", slug: "monitores", description: "Telas de alta definição para jogos e trabalho" },
+      { name: "Periféricos", slug: "perifericos", description: "Acessórios como teclados, mouses e controles" },
+      { name: "Headsets", slug: "headsets", description: "Fones de ouvido com microfone para imersão total" },
     ]).select();
 
     const perifericos = parents?.find((c) => c.name === "Periféricos");
     if (perifericos) {
       await supabase.from("categories").insert([
-        { name: "Teclados", description: "Teclados mecânicos e de membrana", parent_id: perifericos.id },
-        { name: "Mouses", description: "Mouses gamer e ergonômicos", parent_id: perifericos.id },
+        { name: "Teclados", slug: "teclados", description: "Teclados mecânicos e de membrana", parent_id: perifericos.id },
+        { name: "Mouses", slug: "mouses", description: "Mouses gamer e ergonômicos", parent_id: perifericos.id },
       ]);
     }
 

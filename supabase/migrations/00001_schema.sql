@@ -34,6 +34,7 @@ create table public.addresses (
 create table public.categories (
   id          uuid primary key default gen_random_uuid(),
   name        text not null,
+  slug        text,
   description text,
   parent_id   uuid references public.categories(id) on delete set null,
   created_at  timestamptz not null default now(),
@@ -231,6 +232,7 @@ create index idx_addresses_user_id on public.addresses(user_id);
 
 -- categories
 create index idx_categories_parent_id on public.categories(parent_id);
+create unique index idx_categories_slug on public.categories(slug) where slug is not null;
 
 -- products
 create index idx_products_slug on public.products(slug);
