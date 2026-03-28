@@ -74,12 +74,12 @@ export const Highlights = () => {
 
   return (
     <section className="mx-auto max-w-7xl px-4 py-6">
-      <div className="flex gap-4 overflow-x-auto pb-2">
+      <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-none" style={{ WebkitOverflowScrolling: "touch" }}>
         {categories.map((cat) => (
           <Link
             key={cat.id}
             href={`/highlights/${cat.slug ?? cat.id}`}
-            className="shrink-0 rounded-2xl border bg-white p-4 shadow-sm transition-shadow hover:shadow-md"
+            className="flex shrink-0 flex-col items-center rounded-2xl border bg-white p-4 shadow-sm transition-shadow hover:shadow-md"
           >
             <div className="size-24 overflow-hidden rounded-xl bg-muted">
               {cat.image_url ? (
