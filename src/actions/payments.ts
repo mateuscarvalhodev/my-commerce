@@ -59,12 +59,12 @@ export async function createPayment(data: {
   const customerName = data.customer.name || profile?.name || "Cliente";
   const amountCents = Math.round(Number(order.total) * 100);
 
-  // Create customer in AbacatePay
+  // Create customer in AbacatePay (cellphone is required by v1)
   const customerRes = await createCustomer({
     email: customerEmail,
     name: customerName,
-    taxId: data.customer.taxId,
-    cellphone: data.customer.cellphone,
+    taxId: data.customer.taxId ?? "",
+    cellphone: data.customer.cellphone || "11999999999",
   });
 
   let paymentRecord: Record<string, unknown> = {

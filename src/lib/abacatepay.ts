@@ -66,9 +66,9 @@ export interface AbacateCustomer {
 
 export interface CreateCustomerInput {
   name: string;
-  cellphone?: string;
+  cellphone: string;
   email: string;
-  taxId?: string;
+  taxId: string;
 }
 
 export interface CreateCustomerResponse {
