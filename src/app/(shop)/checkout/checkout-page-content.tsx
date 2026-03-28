@@ -360,16 +360,16 @@ export function CheckoutPageContent() {
                       <Label>Cidade / UF</Label>
                       <Input value={`${guestCity} / ${guestState}`} readOnly className="bg-muted/50" />
                     </div>
+                    <div className="grid gap-2">
+                      <Label>Número *</Label>
+                      <Input value={guestNumber} onChange={(e) => setGuestNumber(e.target.value)} placeholder="123" required />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label>Complemento</Label>
+                      <Input value={guestComplement} onChange={(e) => setGuestComplement(e.target.value)} placeholder="Apto, bloco..." />
+                    </div>
                   </>
                 ) : null}
-                <div className="grid gap-2">
-                  <Label>Número *</Label>
-                  <Input value={guestNumber} onChange={(e) => setGuestNumber(e.target.value)} placeholder="123" required />
-                </div>
-                <div className="grid gap-2">
-                  <Label>Complemento</Label>
-                  <Input value={guestComplement} onChange={(e) => setGuestComplement(e.target.value)} placeholder="Apto, bloco..." />
-                </div>
               </div>
             </div>
           ) : null}
