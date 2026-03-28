@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { useCart } from "@/context/cart-context";
 import type { CommerceImageSource } from "@/lib/commerce/types";
@@ -33,6 +34,7 @@ export function ProductActions({
   variants = [],
   defaultSize,
 }: ProductActionsProps) {
+  const router = useRouter();
   const { addItem } = useCart();
   const hasSizes = sizes.length > 0;
   const defaultSelected = defaultSize ?? sizes[0] ?? DEFAULT_SIZE;
@@ -62,6 +64,8 @@ export function ProductActions({
       variantId: selectedVariant?.id,
       qty,
     });
+
+    router.push("/checkout");
   }
 
   return (

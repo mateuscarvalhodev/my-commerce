@@ -469,6 +469,10 @@ export function CheckoutPageContent() {
             {submitting ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
             {submitting ? "Processando..." : "Confirmar e pagar"}
           </Button>
+
+          <Button type="button" variant="ghost" className="w-full" asChild>
+            <Link href="/products">Continuar comprando</Link>
+          </Button>
         </form>
       </section>
 

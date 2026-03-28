@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -50,6 +51,7 @@ export const ProductCard = ({
   sizes,
 }: ProductCardProps) => {
   const isCompact = density === "compact";
+  const router = useRouter();
   const [openQuickBuy, setOpenQuickBuy] = React.useState(false);
   const { addItem } = useCart();
 
@@ -230,6 +232,7 @@ export const ProductCard = ({
             size,
             qty,
           });
+          router.push("/checkout");
         }}
       />
     </>
