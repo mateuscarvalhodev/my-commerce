@@ -9,7 +9,6 @@ import { createClient } from "@/lib/supabase/client";
 type CategoryItem = {
   id: string;
   name: string;
-  slug?: string | null;
   image_url?: string | null;
 };
 
@@ -40,7 +39,7 @@ export const Highlights = () => {
       // Busca categorias + imagem do primeiro produto de cada uma
       const { data: cats } = await supabase
         .from("categories")
-        .select("id, name, slug");
+        .select("id, name");
 
       if (!cats || cats.length === 0) {
         setLoading(false);
@@ -57,7 +56,6 @@ export const Highlights = () => {
         return {
           id: String(cat.id),
           name: cat.name,
-          slug: cat.slug,
           image_url: match?.image_url ?? null,
         };
       });
@@ -78,7 +76,7 @@ export const Highlights = () => {
         {categories.map((cat) => (
           <Link
             key={cat.id}
-            href={`/highlights/${cat.slug ?? cat.id}`}
+            href={`/products?category=${cat.id}`}
             className="flex shrink-0 flex-col items-center rounded-2xl border bg-white p-4 shadow-sm transition-shadow hover:shadow-md"
           >
             <div className="size-24 overflow-hidden rounded-xl bg-muted">
