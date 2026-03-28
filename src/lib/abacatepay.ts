@@ -227,9 +227,7 @@ export async function checkPixStatus(
 }
 
 export async function simulatePixPayment(pixId: string) {
-  return abacateRequest("POST", "/pixQrCode/simulate-payment", {
-    id: pixId,
-  });
+  return abacateRequest("POST", `/pixQrCode/simulate-payment?id=${encodeURIComponent(pixId)}`, {});
 }
 
 // ─── Webhook verification ────────────────────────────────────────────────────

@@ -17,6 +17,10 @@ export async function simulatePayment(pixId: string) {
 
   if (profile?.role !== "admin") throw new Error("Acesso negado");
 
-  const result = await simulatePixPayment(pixId);
+  const id = String(pixId ?? "").trim();
+  if (!id) throw new Error("ID da cobrança é obrigatório");
+
+  console.log("[SimulatePayment] id:", id);
+  const result = await simulatePixPayment(id);
   return result;
 }
