@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { Loader2, Minus, Plus, ShoppingBag, Trash2 } from "lucide-react";
+import { useState } from "react";
+import { Loader2, Minus, Plus, ShoppingBag, Trash2, Truck, Package } from "lucide-react";
 import { CommerceImage } from "@/components/ui/commerce-image";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { useCart } from "@/context/cart-context";
 import { currency } from "@/utils/currency";
@@ -126,12 +128,15 @@ export function CartPageContent() {
             <span>Subtotal</span>
             <span className="font-medium">{currency(subtotal)}</span>
           </div>
-          <div className="flex items-center justify-between">
-            <span>Frete</span>
-            <span className="text-muted-foreground">Calcular no checkout</span>
-          </div>
         </div>
+
         <Separator />
+
+        {/* ─── Calculador de frete ─────────────────────────── */}
+        <ShippingEstimate items={items} subtotal={subtotal} />
+
+        <Separator />
+
         <div className="flex items-center justify-between text-lg">
           <span className="font-semibold">Total</span>
           <span className="font-extrabold">{currency(subtotal)}</span>
@@ -144,5 +149,141 @@ export function CartPageContent() {
         </Button>
       </aside>
     </main>
+  );
+}
+
+// ─── Shipping estimate component ──────────────────────────────────────────────
+
+type ShippingOption = {
+  service_code: string;
+  service_name: string;
+  price: number;
+  deadline_days: number;
+};
+
+function ShippingEstimate({
+  items,
+  subtotal,
+}: {
+  items: { id: string | number; qty: number }[];
+  subtotal: number;
+}) {
+  const [cep, setCep] = useState("");
+  const [options, setOptions] = useState<ShippingOption[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [searched, setSearched] = useState(false);
+
+  async function handleCalculate() {
+    const clean = cep.replace(/\D/g, "");
+    if (clean.length !== 8) {
+      setError("CEP deve ter 8 dígitos");
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+    setOptions([]);
+
+    try {
+      const res = await fetch("/api/shipping/calculate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          destination_cep: clean,
+          items: items.map((i) => ({
+            product_id: String(i.id),
+            quantity: i.qty,
+          })),
+        }),
+      });
+
+      if (!res.ok) throw new Error("Erro ao calcular frete");
+
+      const data = await res.json();
+      setOptions(data.options ?? []);
+      setSearched(true);
+    } catch {
+      setError("Não foi possível calcular o frete");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function formatCep(value: string) {
+    const digits = value.replace(/\D/g, "").slice(0, 8);
+    if (digits.length > 5) {
+      return `${digits.slice(0, 5)}-${digits.slice(5)}`;
+    }
+    return digits;
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2 text-sm font-semibold">
+        <Truck className="size-4" />
+        Calcular frete
+      </div>
+
+      <div className="flex gap-2">
+        <Input
+          placeholder="00000-000"
+          value={cep}
+          onChange={(e) => setCep(formatCep(e.target.value))}
+          maxLength={9}
+          className="flex-1"
+        />
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={handleCalculate}
+          disabled={loading}
+          className="shrink-0"
+        >
+          {loading ? <Loader2 className="size-4 animate-spin" /> : "Calcular"}
+        </Button>
+      </div>
+
+      {error ? (
+        <p className="text-xs text-destructive">{error}</p>
+      ) : null}
+
+      {searched && options.length === 0 && !loading ? (
+        <p className="text-xs text-muted-foreground">
+          Nenhuma opção disponível para este CEP.
+        </p>
+      ) : null}
+
+      {options.length > 0 ? (
+        <div className="space-y-2">
+          {options.map((opt) => (
+            <div
+              key={opt.service_code}
+              className="flex items-center justify-between rounded-lg border px-3 py-2 text-sm"
+            >
+              <div className="flex items-center gap-2">
+                <Package className="size-4 text-muted-foreground" />
+                <div>
+                  <p className="font-medium">{opt.service_name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {opt.deadline_days === 1
+                      ? "1 dia útil"
+                      : `${opt.deadline_days} dias úteis`}
+                  </p>
+                </div>
+              </div>
+              <span className="font-semibold">
+                {opt.price === 0 ? (
+                  <span className="text-green-600">Grátis</span>
+                ) : (
+                  currency(opt.price)
+                )}
+              </span>
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </div>
   );
 }
