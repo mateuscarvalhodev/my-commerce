@@ -7,16 +7,13 @@ import { Menu, ChevronLeft, Search, ShoppingCart } from "lucide-react";
 
 import { CartDrawer } from "@/components/CartDrawer";
 import { useCart } from "@/context/cart-context";
-import { useState } from "react";
+import { Suspense, useState } from "react";
 
 type HeaderProps = { showBack?: boolean; title?: string };
 
 const ROOT_PATHS = ["/", "/products"];
 
-export const Header = ({
-  showBack,
-  title,
-}: HeaderProps) => {
+function HeaderInner({ showBack, title }: HeaderProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -86,4 +83,10 @@ export const Header = ({
       <CartDrawer open={openCart} onOpenChange={setOpenCart} />
     </>
   );
-};
+}
+
+export const Header = (props: HeaderProps) => (
+  <Suspense>
+    <HeaderInner {...props} />
+  </Suspense>
+);
