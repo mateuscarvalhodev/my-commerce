@@ -20,7 +20,7 @@ All backend logic lives in Server Actions (`src/actions/`) and API Routes (`src/
 - `src/app/api/webhooks/pagarme/` — Pagar.me webhook (public, no auth)
 - `src/app/api/shipping/calculate/` — Shipping calculation endpoint
 - `src/lib/supabase/` — Supabase client helpers (client, server, admin, middleware)
-- `src/lib/pagarme.ts` — Pagar.me API v5 client
+- `src/lib/abacatepay.ts` — AbacatePay API v2 client
 - `src/lib/shipping.ts` — Correios shipping calculator with fallback
 
 ### Authentication
@@ -37,7 +37,7 @@ Key tables: profiles, products, categories, product_variants, product_images, ca
 
 ### Payments
 
-Pagar.me v5 integration supporting PIX, credit card (up to 12x), and boleto. Webhook at `/api/webhooks/pagarme` with HMAC-SHA256 signature verification.
+AbacatePay v2 integration supporting PIX (transparent QR Code) and hosted checkout (PIX + Card). Webhook at `/api/webhooks/abacatepay` with secret query param verification.
 
 ### Shipping
 
@@ -45,7 +45,7 @@ Correios API integration (SEDEX/PAC) with local fallback. Free shipping above co
 
 ## Environment Variables
 
-See `.env.example`. Required: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `PAGARME_SECRET_KEY`.
+See `.env.example`. Required: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `ABACATEPAY_API_KEY`.
 
 ## Language
 

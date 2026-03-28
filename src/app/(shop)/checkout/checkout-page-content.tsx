@@ -12,7 +12,6 @@ import {
   Package,
   CreditCard,
   QrCode,
-  FileText,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -26,7 +25,7 @@ import { createPayment } from "@/actions/payments";
 import { currency } from "@/utils/currency";
 import { cn } from "@/lib/utils";
 
-type PaymentMethodType = "pix" | "credit_card" | "boleto";
+type PaymentMethodType = "pix" | "checkout";
 
 const PAYMENT_METHODS: {
   value: PaymentMethodType;
@@ -38,19 +37,13 @@ const PAYMENT_METHODS: {
     value: "pix",
     label: "PIX",
     icon: QrCode,
-    description: "Aprovação instantânea",
+    description: "QR Code direto, aprovação instantânea",
   },
   {
-    value: "credit_card",
-    label: "Cartão de crédito",
+    value: "checkout",
+    label: "Cartão / PIX (checkout)",
     icon: CreditCard,
-    description: "Até 12x",
-  },
-  {
-    value: "boleto",
-    label: "Boleto bancário",
-    icon: FileText,
-    description: "Vencimento em 3 dias úteis",
+    description: "Página segura do AbacatePay",
   },
 ];
 
@@ -98,12 +91,6 @@ export function CheckoutPageContent() {
   const [cpf, setCpf] = useState("");
 
   // Credit card fields
-  const [cardNumber, setCardNumber] = useState("");
-  const [cardHolder, setCardHolder] = useState("");
-  const [cardExpMonth, setCardExpMonth] = useState("");
-  const [cardExpYear, setCardExpYear] = useState("");
-  const [cardCvv, setCardCvv] = useState("");
-  const [installments, setInstallments] = useState(1);
 
   useEffect(() => {
     async function load() {
@@ -186,47 +173,25 @@ export function CheckoutPageContent() {
         return;
       }
 
-      // 2. Create payment via Pagar.me
-      const selectedAddr = addresses.find((a) => a.id === selectedAddressId);
-
+      // 2. Create payment via AbacatePay
       const paymentInput: any = {
         orderId: order.id,
         customer: {
-          document: cleanCpf,
-          documentType: cleanCpf.length === 14 ? "CNPJ" : "CPF",
+          taxId: cleanCpf,
         },
         payment:
           paymentMethod === "pix"
             ? { method: "pix", expiresIn: 3600 }
-            : paymentMethod === "boleto"
-              ? { method: "boleto" }
-              : {
-                  method: "credit_card",
-                  installments,
-                  card: {
-                    number: cardNumber.replace(/\D/g, ""),
-                    holderName: cardHolder,
-                    expMonth: parseInt(cardExpMonth, 10),
-                    expYear: parseInt(cardExpYear, 10),
-                    cvv: cardCvv,
-                    billingAddress: {
-                      line1: `${selectedAddr?.number}, ${selectedAddr?.street}`,
-                      line2: selectedAddr?.neighborhood ?? "",
-                      zipCode: (selectedAddr?.zip_code ?? "").replace(/\D/g, ""),
-                      city: selectedAddr?.city ?? "",
-                      state: selectedAddr?.state ?? "",
-                      country: "BR",
-                    },
-                  },
-                },
+            : { method: "checkout" },
       };
 
       const payment = await createPayment(paymentInput);
 
       // 3. Redirect based on payment method
-      if (paymentMethod === "credit_card" && payment?.status === "paid") {
-        toast.success("Pagamento aprovado! Pedido confirmado.");
-        router.push("/account/orders");
+      if (paymentMethod === "checkout" && payment?.boleto_url) {
+        // Hosted checkout — redirect to AbacatePay payment page
+        toast.success("Redirecionando para o pagamento...");
+        window.location.href = payment.boleto_url;
       } else {
         toast.success("Pedido criado! Complete o pagamento.");
         router.push(`/checkout/payment/${order.id}`);
@@ -324,79 +289,6 @@ export function CheckoutPageContent() {
               })}
             </div>
           </div>
-
-          {/* Credit card fields */}
-          {paymentMethod === "credit_card" ? (
-            <div className="space-y-3 rounded-lg border bg-muted/20 p-4">
-              <div className="grid gap-2">
-                <Label htmlFor="card-number">Número do cartão</Label>
-                <Input
-                  id="card-number"
-                  value={cardNumber}
-                  onChange={(e) => setCardNumber(e.target.value)}
-                  placeholder="0000 0000 0000 0000"
-                  maxLength={19}
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="card-holder">Nome no cartão</Label>
-                <Input
-                  id="card-holder"
-                  value={cardHolder}
-                  onChange={(e) => setCardHolder(e.target.value.toUpperCase())}
-                  placeholder="NOME COMO NO CARTÃO"
-                />
-              </div>
-              <div className="grid grid-cols-3 gap-3">
-                <div className="grid gap-2">
-                  <Label htmlFor="card-exp-month">Mês</Label>
-                  <Input
-                    id="card-exp-month"
-                    value={cardExpMonth}
-                    onChange={(e) => setCardExpMonth(e.target.value)}
-                    placeholder="MM"
-                    maxLength={2}
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="card-exp-year">Ano</Label>
-                  <Input
-                    id="card-exp-year"
-                    value={cardExpYear}
-                    onChange={(e) => setCardExpYear(e.target.value)}
-                    placeholder="AAAA"
-                    maxLength={4}
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="card-cvv">CVV</Label>
-                  <Input
-                    id="card-cvv"
-                    value={cardCvv}
-                    onChange={(e) => setCardCvv(e.target.value)}
-                    placeholder="123"
-                    maxLength={4}
-                  />
-                </div>
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="installments">Parcelas</Label>
-                <select
-                  id="installments"
-                  value={installments}
-                  onChange={(e) => setInstallments(Number(e.target.value))}
-                  className="h-10 rounded-md border border-input bg-background px-3 text-sm"
-                >
-                  {Array.from({ length: 12 }, (_, i) => i + 1).map((n) => (
-                    <option key={n} value={n}>
-                      {n}x de {currency(orderTotal / n)}
-                      {n === 1 ? " (à vista)" : ""}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          ) : null}
 
           {/* Coupon */}
           <div className="grid gap-2">

@@ -2,50 +2,33 @@
 
 import { createClient } from "@/lib/supabase/server";
 import {
-  createOrder as createPagarmeOrder,
-  type PagarmeCustomer,
-  type PagarmeOrderItem,
-  type PagarmePaymentConfig,
-} from "@/lib/pagarme";
+  createCustomer,
+  createPixQrCode,
+  createCheckout,
+  createProduct,
+  checkPixStatus,
+  type AbacatePixQrCode,
+  type AbacateCheckout,
+} from "@/lib/abacatepay";
 
 interface PixPaymentData {
   method: "pix";
   expiresIn?: number;
 }
 
-interface BoletoPaymentData {
-  method: "boleto";
-  instructions?: string;
-  dueAt?: string;
+interface CheckoutPaymentData {
+  method: "checkout"; // Hosted checkout (PIX + Card via AbacatePay page)
 }
 
-interface CreditCardPaymentData {
-  method: "credit_card";
-  installments: number;
-  card: {
-    number: string;
-    holderName: string;
-    expMonth: number;
-    expYear: number;
-    cvv: string;
-    billingAddress: {
-      line1: string;
-      line2?: string;
-      zipCode: string;
-      city: string;
-      state: string;
-      country: string;
-    };
-  };
-}
-
-type PaymentData = PixPaymentData | BoletoPaymentData | CreditCardPaymentData;
+type PaymentData = PixPaymentData | CheckoutPaymentData;
 
 export async function createPayment(data: {
   orderId: string;
   customer: {
-    document: string;
-    documentType?: "CPF" | "CNPJ";
+    email?: string;
+    taxId?: string;
+    name?: string;
+    cellphone?: string;
   };
   payment: PaymentData;
 }) {
@@ -53,9 +36,9 @@ export async function createPayment(data: {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) throw new Error("Nao autenticado");
+  if (!user) throw new Error("Não autenticado");
 
-  // Get order
+  // Get order with items
   const { data: order, error: orderError } = await supabase
     .from("orders")
     .select("*, order_items(*, product:products(*))")
@@ -63,126 +46,98 @@ export async function createPayment(data: {
     .eq("user_id", user.id)
     .single();
 
-  if (orderError || !order) throw new Error("Pedido nao encontrado");
+  if (orderError || !order) throw new Error("Pedido não encontrado");
+  if (order.status !== "pending") throw new Error("Pedido não está pendente");
 
-  // Get user profile
+  // Get profile
   const { data: profile } = await supabase
     .from("profiles")
     .select("*")
     .eq("id", user.id)
     .single();
 
-  // Build Pagar.me customer
-  const docType = data.customer.documentType ?? "CPF";
-  const pagarmeCustomer: PagarmeCustomer = {
-    name: profile?.name || user.email || "Cliente",
-    email: user.email || "",
-    document: data.customer.document,
-    document_type: docType,
-    type: docType === "CPF" ? "individual" : "company",
-  };
+  const customerEmail = data.customer.email || user.email || "";
+  const customerName = data.customer.name || profile?.name || "Cliente";
 
-  // Build Pagar.me items
-  const pagarmeItems: PagarmeOrderItem[] = order.order_items.map(
-    (item: any) => ({
-      amount: Math.round(Number(item.unit_price) * 100),
-      description: item.product.name,
-      quantity: item.quantity,
-      code: item.product_id,
-    })
-  );
-
-  // Build payment config
-  let paymentConfig: PagarmePaymentConfig;
-
-  switch (data.payment.method) {
-    case "pix":
-      paymentConfig = {
-        payment_method: "pix",
-        pix: {
-          expires_in: data.payment.expiresIn ?? 3600,
-        },
-      };
-      break;
-    case "boleto":
-      paymentConfig = {
-        payment_method: "boleto",
-        boleto: {
-          instructions:
-            data.payment.instructions ?? "Pagar ate o vencimento",
-          due_at:
-            data.payment.dueAt ??
-            new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
-        },
-      };
-      break;
-    case "credit_card":
-      paymentConfig = {
-        payment_method: "credit_card",
-        credit_card: {
-          installments: data.payment.installments,
-          card: {
-            number: data.payment.card.number,
-            holder_name: data.payment.card.holderName,
-            exp_month: data.payment.card.expMonth,
-            exp_year: data.payment.card.expYear,
-            cvv: data.payment.card.cvv,
-            billing_address: {
-              line_1: data.payment.card.billingAddress.line1,
-              line_2: data.payment.card.billingAddress.line2,
-              zip_code: data.payment.card.billingAddress.zipCode,
-              city: data.payment.card.billingAddress.city,
-              state: data.payment.card.billingAddress.state,
-              country: data.payment.card.billingAddress.country,
-            },
-          },
-        },
-      };
-      break;
-    default:
-      throw new Error("Metodo de pagamento invalido");
-  }
-
-  // Call Pagar.me API
-  const pagarmeOrder = await createPagarmeOrder({
-    customer: pagarmeCustomer,
-    items: pagarmeItems,
-    payments: [paymentConfig],
-    metadata: {
-      order_id: order.id,
-    },
+  // Create or find customer in AbacatePay
+  const customerRes = await createCustomer({
+    email: customerEmail,
+    name: customerName,
+    taxId: data.customer.taxId,
+    cellphone: data.customer.cellphone,
   });
 
-  const charge = pagarmeOrder.charges?.[0];
-  const lastTransaction = charge?.last_transaction;
+  const abacateCustomerId = customerRes.data.id!;
+  const amountCents = Math.round(Number(order.total) * 100);
 
-  // Save payment record in DB
-  const paymentRecord: Record<string, unknown> = {
+  let paymentRecord: Record<string, unknown> = {
     order_id: order.id,
-    status: charge?.status ?? "pending",
-    method: data.payment.method,
-    amount_cents: Math.round(Number(order.total) * 100),
-    gateway_id: charge?.id ?? null,
-    gateway_status: charge?.status ?? null,
-    gateway_response: pagarmeOrder as unknown as Record<string, unknown>,
+    amount_cents: amountCents,
   };
 
-  // Add method-specific fields
   if (data.payment.method === "pix") {
-    paymentRecord.pix_qr_code = lastTransaction?.qr_code ?? null;
-    paymentRecord.pix_qr_code_url = lastTransaction?.qr_code_url ?? null;
-    paymentRecord.pix_expires_at = lastTransaction?.expires_at ?? null;
-  } else if (data.payment.method === "boleto") {
-    paymentRecord.boleto_url = lastTransaction?.url ?? null;
-    paymentRecord.boleto_barcode = lastTransaction?.barcode ?? null;
-    paymentRecord.boleto_due_date = lastTransaction?.due_at ?? null;
-  } else if (data.payment.method === "credit_card") {
-    paymentRecord.card_last_digits =
-      lastTransaction?.card?.last_four_digits ?? null;
-    paymentRecord.card_brand = lastTransaction?.card?.brand ?? null;
-    paymentRecord.installments = lastTransaction?.installments ?? 1;
+    // ─── Transparent PIX (QR Code direto) ─────────────────────────────
+    const pixRes = await createPixQrCode({
+      amount: amountCents,
+      description: `Pedido #${order.id.slice(0, 8)}`,
+      expiresIn: data.payment.expiresIn ?? 3600,
+      customer: {
+        email: customerEmail,
+        name: customerName,
+        taxId: data.customer.taxId,
+      },
+      metadata: { order_id: order.id },
+    });
+
+    const pix: AbacatePixQrCode = pixRes.data;
+
+    paymentRecord = {
+      ...paymentRecord,
+      method: "pix",
+      status: pix.status === "PAID" ? "paid" : "waiting_payment",
+      gateway_id: pix.id,
+      gateway_status: pix.status,
+      pix_qr_code: pix.brCode,
+      pix_qr_code_url: pix.qrCodeUrl ?? null,
+      pix_expires_at: pix.expiresAt,
+      gateway_response: pixRes as unknown as Record<string, unknown>,
+    };
+  } else {
+    // ─── Hosted Checkout (AbacatePay page — PIX + Card) ───────────────
+    // Ensure products exist in AbacatePay
+    const productIds: string[] = [];
+    for (const item of order.order_items as any[]) {
+      const prodRes = await createProduct({
+        externalId: item.product_id,
+        name: item.product?.name ?? `Produto ${item.product_id.slice(0, 8)}`,
+        price: Math.round(Number(item.unit_price) * 100) * item.quantity,
+      });
+      productIds.push(prodRes.data.id);
+    }
+
+    const completionUrl = `${process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"}/checkout/payment/${order.id}`;
+
+    const checkoutRes = await createCheckout({
+      customerId: abacateCustomerId,
+      items: productIds.map((id) => ({ productId: id, quantity: 1 })),
+      completionUrl,
+      metadata: { order_id: order.id },
+    });
+
+    const checkout: AbacateCheckout = checkoutRes.data;
+
+    paymentRecord = {
+      ...paymentRecord,
+      method: "credit_card", // checkout supports card + pix
+      status: checkout.status === "PAID" ? "paid" : "waiting_payment",
+      gateway_id: checkout.id,
+      gateway_status: checkout.status,
+      boleto_url: checkout.url, // reuse field to store checkout URL
+      gateway_response: checkoutRes as unknown as Record<string, unknown>,
+    };
   }
 
+  // Save payment in DB
   const { data: payment, error: paymentError } = await supabase
     .from("payments")
     .insert(paymentRecord)
@@ -191,12 +146,13 @@ export async function createPayment(data: {
 
   if (paymentError) throw new Error("Erro ao salvar pagamento");
 
-  // Update order with payment_id and gateway_order_id
+  // Update order
   await supabase
     .from("orders")
     .update({
       payment_id: payment.id,
-      gateway_order_id: pagarmeOrder.id,
+      gateway_order_id: paymentRecord.gateway_id as string,
+      payment_method: data.payment.method,
       updated_at: new Date().toISOString(),
     })
     .eq("id", order.id);
@@ -209,9 +165,8 @@ export async function getPaymentByOrder(orderId: string) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) throw new Error("Nao autenticado");
+  if (!user) throw new Error("Não autenticado");
 
-  // Verify user owns the order
   const { data: order } = await supabase
     .from("orders")
     .select("id")
@@ -219,7 +174,7 @@ export async function getPaymentByOrder(orderId: string) {
     .eq("user_id", user.id)
     .single();
 
-  if (!order) throw new Error("Pedido nao encontrado");
+  if (!order) throw new Error("Pedido não encontrado");
 
   const { data, error } = await supabase
     .from("payments")
@@ -230,6 +185,37 @@ export async function getPaymentByOrder(orderId: string) {
     .single();
 
   if (error) throw new Error(error.message);
+
+  // If PIX, poll AbacatePay for updated status
+  if (data?.method === "pix" && data?.gateway_id && data?.status !== "paid") {
+    try {
+      const statusRes = await checkPixStatus(data.gateway_id);
+      const newStatus = statusRes.data.status;
+
+      if (newStatus === "PAID" && data.status !== "paid") {
+        const supabaseAdmin = (await import("@/lib/supabase/admin")).createAdminClient();
+        await supabaseAdmin
+          .from("payments")
+          .update({
+            status: "paid",
+            gateway_status: newStatus,
+            paid_at: new Date().toISOString(),
+          })
+          .eq("id", data.id);
+
+        await supabaseAdmin
+          .from("orders")
+          .update({ status: "paid" })
+          .eq("id", orderId)
+          .eq("status", "pending");
+
+        data.status = "paid";
+        data.paid_at = new Date().toISOString();
+      }
+    } catch {
+      // Ignore status check errors
+    }
+  }
 
   return data;
 }
