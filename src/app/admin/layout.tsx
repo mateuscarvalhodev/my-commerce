@@ -15,6 +15,7 @@ import {
   RotateCcw,
   FolderTree,
   ShieldX,
+  Zap,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
@@ -27,6 +28,7 @@ const adminNav = [
   { href: "/admin/reviews", label: "Avaliações", icon: Star },
   { href: "/admin/returns", label: "Devoluções", icon: RotateCcw },
   { href: "/admin/categories", label: "Categorias", icon: FolderTree },
+  { href: "/admin/simulate-payment", label: "Simular PIX", icon: Zap },
 ];
 
 export default function AdminLayout({
