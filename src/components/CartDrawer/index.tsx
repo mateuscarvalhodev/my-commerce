@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import {
   Loader2,
@@ -9,9 +10,11 @@ import {
   Store,
   Trash2,
   Truck,
+  Package,
 } from "lucide-react";
 import { useCart } from "@/context/cart-context";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import {
   Sheet,
@@ -156,39 +159,7 @@ export function CartDrawer({ open, onOpenChange }: CartDrawerProps) {
 
               <Separator />
 
-              <div className="space-y-3 py-4 text-sm">
-                <div className="flex items-center gap-2">
-                  <Truck className="size-4 text-primary" />
-                  <span className="font-semibold uppercase text-[11px]">
-                    Entrega
-                  </span>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  O frete e calculado no checkout pela API atual.
-                </p>
-              </div>
-
-              <Separator />
-
-              <div className="space-y-3 py-4 text-sm">
-                <div className="flex items-center gap-2">
-                  <Store className="size-4 text-primary" />
-                  <span className="font-semibold uppercase text-[11px]">
-                    Nossa loja
-                  </span>
-                </div>
-
-                <div className="flex items-start justify-between gap-3 rounded-md border bg-neutral-white px-3 py-2">
-                  <div className="space-y-1 text-xs text-muted-foreground">
-                    <p>
-                      Retirada em loja ou envio definido no checkout.
-                    </p>
-                  </div>
-                  <span className="text-xs font-semibold text-accent">
-                    Gratis
-                  </span>
-                </div>
-              </div>
+              <DrawerShippingEstimate items={items} />
 
               <Separator />
 
@@ -224,5 +195,125 @@ export function CartDrawer({ open, onOpenChange }: CartDrawerProps) {
         </div>
       </SheetContent>
     </Sheet>
+  );
+}
+
+// ─── Shipping estimate inside drawer ──────────────────────────────────────────
+
+type ShippingOpt = {
+  service_code: string;
+  service_name: string;
+  price: number;
+  deadline_days: number;
+};
+
+function DrawerShippingEstimate({
+  items,
+}: {
+  items: { id: string | number; qty: number }[];
+}) {
+  const [cep, setCep] = useState("");
+  const [options, setOptions] = useState<ShippingOpt[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [searched, setSearched] = useState(false);
+
+  function formatCep(value: string) {
+    const digits = value.replace(/\D/g, "").slice(0, 8);
+    return digits.length > 5 ? `${digits.slice(0, 5)}-${digits.slice(5)}` : digits;
+  }
+
+  async function handleCalculate() {
+    const clean = cep.replace(/\D/g, "");
+    if (clean.length !== 8) {
+      setError("CEP deve ter 8 dígitos");
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+    setOptions([]);
+
+    try {
+      const res = await fetch("/api/shipping/calculate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          destination_cep: clean,
+          items: items.map((i) => ({
+            product_id: String(i.id),
+            quantity: i.qty,
+          })),
+        }),
+      });
+
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      setOptions(data.options ?? []);
+      setSearched(true);
+    } catch {
+      setError("Não foi possível calcular o frete");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="space-y-3 py-4 text-sm">
+      <div className="flex items-center gap-2">
+        <Truck className="size-4 text-primary" />
+        <span className="font-semibold uppercase text-[11px]">Calcular frete</span>
+      </div>
+
+      <div className="flex gap-2">
+        <Input
+          placeholder="00000-000"
+          value={cep}
+          onChange={(e) => setCep(formatCep(e.target.value))}
+          maxLength={9}
+          className="h-8 flex-1 text-xs"
+        />
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-8 shrink-0 text-xs"
+          onClick={handleCalculate}
+          disabled={loading}
+        >
+          {loading ? <Loader2 className="size-3 animate-spin" /> : "OK"}
+        </Button>
+      </div>
+
+      {error ? <p className="text-xs text-destructive">{error}</p> : null}
+
+      {searched && options.length === 0 && !loading ? (
+        <p className="text-xs text-muted-foreground">Sem opções para este CEP.</p>
+      ) : null}
+
+      {options.map((opt) => (
+        <div
+          key={opt.service_code}
+          className="flex items-center justify-between rounded-md border px-3 py-2"
+        >
+          <div className="flex items-center gap-2">
+            <Package className="size-3.5 text-muted-foreground" />
+            <div>
+              <p className="text-xs font-medium">{opt.service_name}</p>
+              <p className="text-[10px] text-muted-foreground">
+                {opt.deadline_days === 1 ? "1 dia útil" : `${opt.deadline_days} dias úteis`}
+              </p>
+            </div>
+          </div>
+          <span className="text-xs font-semibold">
+            {opt.price === 0 ? (
+              <span className="text-green-600">Grátis</span>
+            ) : (
+              currency(opt.price)
+            )}
+          </span>
+        </div>
+      ))}
+    </div>
   );
 }
