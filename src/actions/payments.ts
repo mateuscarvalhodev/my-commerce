@@ -164,22 +164,10 @@ export async function createPayment(data: {
 }
 
 export async function getPaymentByOrder(orderId: string) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("Não autenticado");
+  const { createAdminClient } = await import("@/lib/supabase/admin");
+  const admin = createAdminClient();
 
-  const { data: order } = await supabase
-    .from("orders")
-    .select("id")
-    .eq("id", orderId)
-    .eq("user_id", user.id)
-    .single();
-
-  if (!order) throw new Error("Pedido não encontrado");
-
-  const { data, error } = await supabase
+  const { data, error } = await admin
     .from("payments")
     .select("*")
     .eq("order_id", orderId)
@@ -187,23 +175,20 @@ export async function getPaymentByOrder(orderId: string) {
     .limit(1)
     .single();
 
-  if (error) throw new Error(error.message);
+  if (error || !data) throw new Error("Pagamento não encontrado");
 
   // If PIX, poll AbacatePay for updated status
-  if (data?.method === "pix" && data?.gateway_id && data?.status !== "paid") {
+  if (data.method === "pix" && data.gateway_id && data.status !== "paid") {
     try {
-      const statusRes = await checkPixStatus(data.gateway_id);
-      const newStatus = statusRes.data.status;
+      const pixRes = await checkPixStatus(data.gateway_id);
+      const pix = (pixRes as any).data ?? pixRes;
 
-      if (newStatus === "PAID" && data.status !== "paid") {
-        const { createAdminClient } = await import("@/lib/supabase/admin");
-        const admin = createAdminClient();
-
+      if (pix.status === "PAID" && data.status !== "paid") {
         await admin
           .from("payments")
           .update({
             status: "paid",
-            gateway_status: newStatus,
+            gateway_status: "PAID",
             paid_at: new Date().toISOString(),
           })
           .eq("id", data.id);
