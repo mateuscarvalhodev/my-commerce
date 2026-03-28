@@ -1,62 +1,89 @@
-import { Package, ShoppingCart, Users, DollarSign } from "lucide-react";
+"use client";
+
+import { useEffect, useState } from "react";
 import { getAdminStats } from "@/actions/admin";
-import { currency } from "@/lib/utils";
+import { currency } from "@/utils/currency";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Separator } from "@/components/ui/separator";
 
-export default async function AdminDashboardPage() {
-  const stats = await getAdminStats();
+export default function AdminDashboardPage() {
+  const [stats, setStats] = useState<{
+    totalOrders: number;
+    totalProducts: number;
+    totalCustomers: number;
+    totalRevenue: number;
+  } | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const cards = [
-    {
-      label: "Total de Pedidos",
-      value: stats.totalOrders,
-      icon: ShoppingCart,
-      color: "text-blue-600",
-      bg: "bg-blue-50",
-    },
-    {
-      label: "Produtos",
-      value: stats.totalProducts,
-      icon: Package,
-      color: "text-purple-600",
-      bg: "bg-purple-50",
-    },
-    {
-      label: "Clientes",
-      value: stats.totalCustomers,
-      icon: Users,
-      color: "text-green-600",
-      bg: "bg-green-50",
-    },
-    {
-      label: "Receita Total",
-      value: currency(stats.totalRevenue),
-      icon: DollarSign,
-      color: "text-amber-600",
-      bg: "bg-amber-50",
-    },
-  ];
+  useEffect(() => {
+    async function load() {
+      try {
+        const data = await getAdminStats();
+        setStats(data);
+      } catch {
+        // Error loading stats
+      } finally {
+        setLoading(false);
+      }
+    }
+    load();
+  }, []);
 
   return (
-    <div>
-      <h2 className="mb-6 text-2xl font-bold">Dashboard</h2>
+    <div className="space-y-6">
+      <h1 className="text-2xl font-bold">Dashboard</h1>
 
-      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-        {cards.map((card) => (
-          <div
-            key={card.label}
-            className="rounded-lg border bg-card p-6 shadow-sm"
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">{card.label}</p>
-                <p className="mt-1 text-2xl font-bold">{card.value}</p>
-              </div>
-              <div className={`rounded-full p-3 ${card.bg}`}>
-                <card.icon className={`h-5 w-5 ${card.color}`} />
-              </div>
-            </div>
-          </div>
-        ))}
+      <Separator />
+
+      {/* KPI Cards */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Receita total
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <Skeleton className="h-8 w-32" />
+            ) : (
+              <p className="text-2xl font-bold">
+                {currency(stats?.totalRevenue ?? 0)}
+              </p>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Total de pedidos
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <Skeleton className="h-8 w-20" />
+            ) : (
+              <p className="text-2xl font-bold">{stats?.totalOrders ?? 0}</p>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Clientes
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <Skeleton className="h-8 w-20" />
+            ) : (
+              <p className="text-2xl font-bold">{stats?.totalCustomers ?? 0}</p>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
