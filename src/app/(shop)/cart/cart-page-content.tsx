@@ -2,7 +2,15 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Loader2, Minus, Plus, ShoppingBag, Trash2, Truck, Package } from "lucide-react";
+import {
+  Loader2,
+  Minus,
+  Plus,
+  ShoppingBag,
+  Trash2,
+  Truck,
+  Package,
+} from "lucide-react";
 import { CommerceImage } from "@/components/ui/commerce-image";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -245,9 +253,7 @@ function ShippingEstimate({
         </Button>
       </div>
 
-      {error ? (
-        <p className="text-xs text-destructive">{error}</p>
-      ) : null}
+      {error ? <p className="text-xs text-destructive">{error}</p> : null}
 
       {searched && options.length === 0 && !loading ? (
         <p className="text-xs text-muted-foreground">

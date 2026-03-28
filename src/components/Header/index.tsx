@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Menu, ChevronLeft, Search, ShoppingCart } from "lucide-react";
@@ -11,20 +11,31 @@ import { useState } from "react";
 
 type HeaderProps = { showBack?: boolean; title?: string };
 
+const ROOT_PATHS = ["/", "/products"];
+
 export const Header = ({
-  showBack = false,
-  title = "FitStyle",
+  showBack,
+  title,
 }: HeaderProps) => {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { totalQty } = useCart();
   const [openCart, setOpenCart] = useState(false);
+
+  const hasCategory = searchParams.get("category");
+  const isDeepPage =
+    showBack ??
+    (!ROOT_PATHS.includes(pathname) || !!hasCategory);
+
+  const displayTitle = title ?? "FitStyle";
 
   return (
     <>
       <header className="sticky top-0 z-40 border-b bg-background/80 backdrop-blur supports-backdrop-filter:bg-background/60">
         <div className="mx-auto grid grid-cols-3 items-center gap-2 px-4 py-3">
           <div className="justify-self-start">
-            {showBack ? (
+            {isDeepPage ? (
               <Button
                 variant="ghost"
                 size="icon"
@@ -44,7 +55,7 @@ export const Header = ({
 
           <div className="justify-self-center">
             <span className="font-bold text-lg">
-              {showBack ? title : "FitStyle"}
+              {displayTitle}
             </span>
           </div>
 
