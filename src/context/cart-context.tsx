@@ -93,17 +93,34 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       if (!userId) return;
 
       try {
-        // Delete existing cart items for user
-        await supabase.from("cart_items").delete().eq("user_id", userId);
+        // Get or create cart for user
+        let { data: cart } = await supabase
+          .from("carts")
+          .select("id")
+          .eq("user_id", userId)
+          .single();
+
+        if (!cart) {
+          const { data: newCart } = await supabase
+            .from("carts")
+            .insert({ user_id: userId, total: 0 })
+            .select("id")
+            .single();
+          cart = newCart;
+        }
+
+        if (!cart) return;
+
+        // Delete existing cart items
+        await supabase.from("cart_items").delete().eq("cart_id", cart.id);
 
         if (nextItems.length === 0) return;
 
         // Insert new items
         const rows = nextItems.map((item) => ({
-          user_id: userId,
+          cart_id: cart!.id,
           product_id: String(item.id),
           quantity: item.qty,
-          size: item.size ?? null,
           price: item.price,
         }));
 
@@ -122,10 +139,23 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     async function loadServerCart() {
       setServerLoading(true);
       try {
+        // Find user's cart
+        const { data: cart } = await supabase
+          .from("carts")
+          .select("id")
+          .eq("user_id", userId!)
+          .single();
+
+        if (!cart) {
+          mergedRef.current = true;
+          setServerLoading(false);
+          return;
+        }
+
         const { data: serverItems } = await supabase
           .from("cart_items")
           .select("*, product:products(id, name, price, image_url)")
-          .eq("user_id", userId!);
+          .eq("cart_id", cart.id);
 
         if (!serverItems || serverItems.length === 0) {
           mergedRef.current = true;
