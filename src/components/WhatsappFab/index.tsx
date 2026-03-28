@@ -4,7 +4,7 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 
 const PHONE_NUMBER = "5585998635544";
-const DEFAULT_MSG = "Ola! Vim pelo site.";
+const DEFAULT_MSG = "Olá! Vim pelo site.";
 
 export function WhatsAppFAB({
   className,

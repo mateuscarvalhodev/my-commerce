@@ -60,7 +60,7 @@ export default function WishlistPage() {
       await addToCart(productId, 1);
       toast.success("Adicionado ao carrinho!");
     } catch {
-      toast.error("Faca login para adicionar ao carrinho");
+      toast.error("Faça login para adicionar ao carrinho");
     }
   }
 
@@ -85,7 +85,7 @@ export default function WishlistPage() {
         <div className="text-center py-12 space-y-3">
           <Heart className="mx-auto size-12 text-muted-foreground/30" />
           <p className="text-sm text-muted-foreground">
-            Sua lista de desejos esta vazia.
+            Sua lista de desejos está vazia.
           </p>
           <Button asChild variant="outline">
             <Link href="/products">Ver produtos</Link>

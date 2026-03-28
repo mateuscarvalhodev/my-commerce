@@ -38,19 +38,19 @@ const PAYMENT_METHODS: {
     value: "pix",
     label: "PIX",
     icon: QrCode,
-    description: "Aprovacao instantanea",
+    description: "Aprovação instantânea",
   },
   {
     value: "credit_card",
-    label: "Cartao de credito",
+    label: "Cartão de crédito",
     icon: CreditCard,
-    description: "Ate 12x",
+    description: "Até 12x",
   },
   {
     value: "boleto",
-    label: "Boleto bancario",
+    label: "Boleto bancário",
     icon: FileText,
-    description: "Vencimento em 3 dias uteis",
+    description: "Vencimento em 3 dias úteis",
   },
 ];
 
@@ -156,18 +156,18 @@ export function CheckoutPageContent() {
     event.preventDefault();
 
     if (!selectedAddressId) {
-      toast.error("Selecione um endereco de entrega.");
+      toast.error("Selecione um endereço de entrega.");
       return;
     }
 
     if (!selectedShipping) {
-      toast.error("Selecione uma opcao de frete.");
+      toast.error("Selecione uma opção de frete.");
       return;
     }
 
     const cleanCpf = cpf.replace(/\D/g, "");
     if (cleanCpf.length !== 11 && cleanCpf.length !== 14) {
-      toast.error("Informe um CPF ou CNPJ valido.");
+      toast.error("Informe um CPF ou CNPJ válido.");
       return;
     }
 
@@ -235,7 +235,7 @@ export function CheckoutPageContent() {
       toast.error(
         error instanceof Error
           ? error.message
-          : "Nao foi possivel concluir o pedido."
+          : "Não foi possível concluir o pedido."
       );
     } finally {
       setSubmitting(false);
@@ -261,12 +261,12 @@ export function CheckoutPageContent() {
       <main className="mx-auto max-w-4xl px-4 py-10">
         <div className="flex flex-col items-center gap-4 text-center">
           <ShoppingBag className="size-10 opacity-60" />
-          <h1 className="text-xl font-bold">Nao ha itens para finalizar</h1>
+          <h1 className="text-xl font-bold">Não há itens para finalizar</h1>
           <p className="text-sm text-muted-foreground">
             Adicione produtos ao carrinho antes de finalizar a compra.
           </p>
           <Button asChild>
-            <Link href="/products">Ir para o catalogo</Link>
+            <Link href="/products">Ir para o catálogo</Link>
           </Button>
         </div>
       </main>
@@ -295,7 +295,7 @@ export function CheckoutPageContent() {
 
           {/* Payment method selector */}
           <div className="space-y-3">
-            <Label>Metodo de pagamento</Label>
+            <Label>Método de pagamento</Label>
             <div className="grid gap-2">
               {PAYMENT_METHODS.map((pm) => {
                 const isSelected = paymentMethod === pm.value;
@@ -329,7 +329,7 @@ export function CheckoutPageContent() {
           {paymentMethod === "credit_card" ? (
             <div className="space-y-3 rounded-lg border bg-muted/20 p-4">
               <div className="grid gap-2">
-                <Label htmlFor="card-number">Numero do cartao</Label>
+                <Label htmlFor="card-number">Número do cartão</Label>
                 <Input
                   id="card-number"
                   value={cardNumber}
@@ -339,17 +339,17 @@ export function CheckoutPageContent() {
                 />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="card-holder">Nome no cartao</Label>
+                <Label htmlFor="card-holder">Nome no cartão</Label>
                 <Input
                   id="card-holder"
                   value={cardHolder}
                   onChange={(e) => setCardHolder(e.target.value.toUpperCase())}
-                  placeholder="NOME COMO NO CARTAO"
+                  placeholder="NOME COMO NO CARTÃO"
                 />
               </div>
               <div className="grid grid-cols-3 gap-3">
                 <div className="grid gap-2">
-                  <Label htmlFor="card-exp-month">Mes</Label>
+                  <Label htmlFor="card-exp-month">Mês</Label>
                   <Input
                     id="card-exp-month"
                     value={cardExpMonth}
@@ -390,7 +390,7 @@ export function CheckoutPageContent() {
                   {Array.from({ length: 12 }, (_, i) => i + 1).map((n) => (
                     <option key={n} value={n}>
                       {n}x de {currency(orderTotal / n)}
-                      {n === 1 ? " (a vista)" : ""}
+                      {n === 1 ? " (à vista)" : ""}
                     </option>
                   ))}
                 </select>
@@ -405,14 +405,14 @@ export function CheckoutPageContent() {
               id="coupon-code"
               value={couponCode}
               onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-              placeholder="Digite o codigo do cupom"
+              placeholder="Digite o código do cupom"
             />
           </div>
 
           {/* Address selector */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <Label>Endereco de entrega</Label>
+              <Label>Endereço de entrega</Label>
               <Button
                 type="button"
                 variant="ghost"
@@ -429,7 +429,7 @@ export function CheckoutPageContent() {
 
             {addresses.length === 0 ? (
               <div className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">
-                <p>Nenhum endereco cadastrado.</p>
+                <p>Nenhum endereço cadastrado.</p>
                 <Button
                   type="button"
                   variant="outline"
@@ -437,7 +437,7 @@ export function CheckoutPageContent() {
                   className="mt-2"
                   asChild
                 >
-                  <Link href="/account/addresses">Cadastrar endereco</Link>
+                  <Link href="/account/addresses">Cadastrar endereço</Link>
                 </Button>
               </div>
             ) : (
@@ -481,7 +481,7 @@ export function CheckoutPageContent() {
             <div className="space-y-3">
               <Label className="flex items-center gap-2">
                 <Truck className="size-4" />
-                Opcoes de frete
+                Opções de frete
               </Label>
 
               {shippingLoading ? (
@@ -491,7 +491,7 @@ export function CheckoutPageContent() {
                 </div>
               ) : shippingOptions.length === 0 ? (
                 <div className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">
-                  Nenhuma opcao de frete disponivel para este endereco.
+                  Nenhuma opção de frete disponível para este endereço.
                 </div>
               ) : (
                 <div className="grid gap-2">
@@ -516,14 +516,14 @@ export function CheckoutPageContent() {
                             <p className="font-medium">{option.service_name}</p>
                             <p className="text-muted-foreground">
                               {option.deadline_days === 1
-                                ? "1 dia util"
-                                : `${option.deadline_days} dias uteis`}
+                                ? "1 dia útil"
+                                : `${option.deadline_days} dias úteis`}
                             </p>
                           </div>
                         </div>
                         <div className="text-right">
                           {option.price === 0 ? (
-                            <span className="font-bold text-green-600">Gratis</span>
+                            <span className="font-bold text-green-600">Grátis</span>
                           ) : (
                             <span className="font-bold">{currency(option.price)}</span>
                           )}
@@ -587,14 +587,14 @@ export function CheckoutPageContent() {
             {selectedShipping ? (
               <span>
                 {shippingCost === 0 ? (
-                  <span className="font-medium text-green-600">Gratis</span>
+                  <span className="font-medium text-green-600">Grátis</span>
                 ) : (
                   currency(shippingCost)
                 )}
               </span>
             ) : (
               <span className="text-muted-foreground">
-                {selectedAddressId ? "Selecione o frete" : "Selecione o endereco"}
+                {selectedAddressId ? "Selecione o frete" : "Selecione o endereço"}
               </span>
             )}
           </div>

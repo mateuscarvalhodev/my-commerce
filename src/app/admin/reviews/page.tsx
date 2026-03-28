@@ -73,7 +73,7 @@ export default function AdminReviewsPage() {
       if (error) throw error;
       setReviews((data ?? []) as Review[]);
     } catch {
-      toast.error("Erro ao carregar avaliacoes");
+      toast.error("Erro ao carregar avaliações");
     } finally {
       setLoading(false);
     }
@@ -86,10 +86,10 @@ export default function AdminReviewsPage() {
         .from("reviews")
         .update({ is_approved: true })
         .eq("id", reviewId);
-      toast.success("Avaliacao aprovada");
+      toast.success("Avaliação aprovada");
       await loadReviews();
     } catch {
-      toast.error("Erro ao aprovar avaliacao");
+      toast.error("Erro ao aprovar avaliação");
     }
   }
 
@@ -100,10 +100,10 @@ export default function AdminReviewsPage() {
         .from("reviews")
         .update({ is_approved: false })
         .eq("id", reviewId);
-      toast.success("Avaliacao rejeitada");
+      toast.success("Avaliação rejeitada");
       await loadReviews();
     } catch {
-      toast.error("Erro ao rejeitar avaliacao");
+      toast.error("Erro ao rejeitar avaliação");
     }
   }
 
@@ -111,10 +111,10 @@ export default function AdminReviewsPage() {
     try {
       const supabase = createClient();
       await supabase.from("reviews").delete().eq("id", reviewId);
-      toast.success("Avaliacao excluida");
+      toast.success("Avaliação excluída");
       await loadReviews();
     } catch {
-      toast.error("Erro ao excluir avaliacao");
+      toast.error("Erro ao excluir avaliação");
     }
   }
 
@@ -122,7 +122,7 @@ export default function AdminReviewsPage() {
     <div className="space-y-6">
       <div className="flex items-center gap-2">
         <Star className="size-5" />
-        <h1 className="text-2xl font-bold">Avaliacoes</h1>
+        <h1 className="text-2xl font-bold">Avaliações</h1>
       </div>
 
       <div className="flex gap-1 rounded-lg border p-1 w-fit">
@@ -147,7 +147,7 @@ export default function AdminReviewsPage() {
         </div>
       ) : reviews.length === 0 ? (
         <p className="py-8 text-center text-sm text-muted-foreground">
-          Nenhuma avaliacao encontrada.
+          Nenhuma avaliação encontrada.
         </p>
       ) : (
         <div className="overflow-x-auto rounded-lg border">
@@ -156,11 +156,11 @@ export default function AdminReviewsPage() {
               <tr className="border-b bg-muted/50">
                 <th className="px-4 py-3 text-left font-medium">Nota</th>
                 <th className="px-4 py-3 text-left font-medium">Produto</th>
-                <th className="px-4 py-3 text-left font-medium">Titulo</th>
-                <th className="px-4 py-3 text-left font-medium">Comentario</th>
+                <th className="px-4 py-3 text-left font-medium">Título</th>
+                <th className="px-4 py-3 text-left font-medium">Comentário</th>
                 <th className="px-4 py-3 text-left font-medium">Status</th>
                 <th className="px-4 py-3 text-left font-medium">Data</th>
-                <th className="px-4 py-3 text-right font-medium">Acoes</th>
+                <th className="px-4 py-3 text-right font-medium">Ações</th>
               </tr>
             </thead>
             <tbody>

@@ -24,8 +24,8 @@ const adminNav = [
   { href: "/admin/orders", label: "Pedidos", icon: ShoppingCart },
   { href: "/admin/customers", label: "Clientes", icon: Users },
   { href: "/admin/coupons", label: "Cupons", icon: Ticket },
-  { href: "/admin/reviews", label: "Avaliacoes", icon: Star },
-  { href: "/admin/returns", label: "Devolucoes", icon: RotateCcw },
+  { href: "/admin/reviews", label: "Avaliações", icon: Star },
+  { href: "/admin/returns", label: "Devoluções", icon: RotateCcw },
   { href: "/admin/categories", label: "Categorias", icon: FolderTree },
 ];
 
@@ -78,13 +78,13 @@ export default function AdminLayout({
           <ShieldX className="mx-auto size-12 text-muted-foreground/40" />
           <p className="text-lg font-semibold">Acesso negado</p>
           <p className="text-sm text-muted-foreground">
-            Apenas administradores podem acessar esta area.
+            Apenas administradores podem acessar esta área.
           </p>
           <Link
             href="/"
             className="inline-block rounded-lg bg-primary px-6 py-2 text-primary-foreground font-semibold"
           >
-            Voltar a loja
+            Voltar à loja
           </Link>
         </div>
       </main>

@@ -107,15 +107,15 @@ export default function AddressesPage() {
         setAddresses((prev) =>
           prev.map((a) => (a.id === editingId ? (updated as Address) : a))
         );
-        toast.success("Endereco atualizado!");
+        toast.success("Endereço atualizado!");
       } else {
         const created = await createAddress(form);
         setAddresses((prev) => [created as Address, ...prev]);
-        toast.success("Endereco adicionado!");
+        toast.success("Endereço adicionado!");
       }
       setDialogOpen(false);
     } catch {
-      toast.error("Erro ao salvar endereco");
+      toast.error("Erro ao salvar endereço");
     } finally {
       setSaving(false);
     }
@@ -126,9 +126,9 @@ export default function AddressesPage() {
     try {
       await deleteAddress(id);
       setAddresses((prev) => prev.filter((a) => a.id !== id));
-      toast.success("Endereco removido!");
+      toast.success("Endereço removido!");
     } catch {
-      toast.error("Erro ao remover endereco");
+      toast.error("Erro ao remover endereço");
     } finally {
       setDeletingId(null);
     }
@@ -151,16 +151,16 @@ export default function AddressesPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold">Enderecos</h1>
+        <h1 className="text-xl font-bold">Endereços</h1>
         <Button size="sm" onClick={openNew}>
           <Plus className="mr-1 size-4" />
-          Novo endereco
+          Novo endereço
         </Button>
       </div>
 
       {addresses.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          Nenhum endereco cadastrado.
+          Nenhum endereço cadastrado.
         </p>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">
@@ -204,7 +204,7 @@ export default function AddressesPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {editingId ? "Editar endereco" : "Novo endereco"}
+              {editingId ? "Editar endereço" : "Novo endereço"}
             </DialogTitle>
           </DialogHeader>
 
@@ -218,7 +218,7 @@ export default function AddressesPage() {
                 />
               </div>
               <div className="space-y-1">
-                <Label>Numero</Label>
+                <Label>Número</Label>
                 <Input
                   value={form.number}
                   onChange={(e) => updateField("number", e.target.value)}

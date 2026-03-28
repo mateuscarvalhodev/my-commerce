@@ -186,7 +186,7 @@ export default function AdminProductsPage() {
               />
             </div>
             <div className="sm:col-span-2">
-              <Label htmlFor="description">Descricao</Label>
+              <Label htmlFor="description">Descrição</Label>
               <Input
                 id="description"
                 value={description}
@@ -194,7 +194,7 @@ export default function AdminProductsPage() {
               />
             </div>
             <div>
-              <Label htmlFor="price">Preco</Label>
+              <Label htmlFor="price">Preço</Label>
               <Input
                 id="price"
                 type="number"
@@ -264,10 +264,10 @@ export default function AdminProductsPage() {
             <thead>
               <tr className="border-b bg-muted/50">
                 <th className="px-4 py-3 text-left font-medium">Nome</th>
-                <th className="px-4 py-3 text-left font-medium">Preco</th>
+                <th className="px-4 py-3 text-left font-medium">Preço</th>
                 <th className="px-4 py-3 text-left font-medium">Estoque</th>
                 <th className="px-4 py-3 text-left font-medium">Status</th>
-                <th className="px-4 py-3 text-left font-medium">Acoes</th>
+                <th className="px-4 py-3 text-left font-medium">Ações</th>
               </tr>
             </thead>
             <tbody>

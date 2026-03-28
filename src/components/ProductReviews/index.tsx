@@ -102,7 +102,7 @@ export function ProductReviews({ productId }: ProductReviewsProps) {
       setImageUrls((prev) => [...prev, url]);
       setNewImageUrl("");
     } catch {
-      toast.error("URL de imagem invalida");
+      toast.error("URL de imagem inválida");
     }
   }
 
@@ -112,7 +112,7 @@ export function ProductReviews({ productId }: ProductReviewsProps) {
 
   async function handleSubmit() {
     if (!userId) {
-      toast.error("Faca login para avaliar");
+      toast.error("Faça login para avaliar");
       return;
     }
 
@@ -130,14 +130,14 @@ export function ProductReviews({ productId }: ProductReviewsProps) {
 
       if (error) throw error;
 
-      toast.success("Avaliacao enviada! Aguarde a aprovacao.");
+      toast.success("Avaliação enviada! Aguarde a aprovação.");
       setShowForm(false);
       setRating(5);
       setTitle("");
       setComment("");
       setImageUrls([]);
     } catch {
-      toast.error("Erro ao enviar avaliacao. Verifique se ja comprou este produto.");
+      toast.error("Erro ao enviar avaliação. Verifique se já comprou este produto.");
     } finally {
       setSubmitting(false);
     }
@@ -157,13 +157,13 @@ export function ProductReviews({ productId }: ProductReviewsProps) {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="space-y-1">
-          <h2 className="text-lg font-bold">Avaliacoes</h2>
+          <h2 className="text-lg font-bold">Avaliações</h2>
           {reviews.length > 0 && (
             <div className="flex items-center gap-2">
               <StarRating value={Math.round(averageRating)} readonly size="sm" />
               <span className="text-sm text-muted-foreground">
                 {averageRating.toFixed(1)} ({reviews.length}{" "}
-                {reviews.length === 1 ? "avaliacao" : "avaliacoes"})
+                {reviews.length === 1 ? "avaliação" : "avaliações"})
               </span>
             </div>
           )}
@@ -187,26 +187,26 @@ export function ProductReviews({ productId }: ProductReviewsProps) {
             <StarRating value={rating} onChange={setRating} />
           </div>
           <div className="space-y-1">
-            <label className="text-sm font-medium">Titulo (opcional)</label>
+            <label className="text-sm font-medium">Título (opcional)</label>
             <Input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="Resumo da avaliacao"
+              placeholder="Resumo da avaliação"
             />
           </div>
           <div className="space-y-1">
-            <label className="text-sm font-medium">Comentario (opcional)</label>
+            <label className="text-sm font-medium">Comentário (opcional)</label>
             <Textarea
               value={comment}
               onChange={(e) => setComment(e.target.value)}
-              placeholder="Conte sua experiencia..."
+              placeholder="Conte sua experiência..."
               rows={3}
             />
           </div>
 
           {/* Image URLs */}
           <div className="space-y-2">
-            <label className="text-sm font-medium">Fotos (opcional, ate 5)</label>
+            <label className="text-sm font-medium">Fotos (opcional, até 5)</label>
             {imageUrls.length > 0 && (
               <div className="flex gap-2 flex-wrap">
                 {imageUrls.map((url, idx) => (
@@ -265,7 +265,7 @@ export function ProductReviews({ productId }: ProductReviewsProps) {
 
       {reviews.length === 0 && !showForm ? (
         <p className="text-sm text-muted-foreground">
-          Nenhuma avaliacao ainda.
+          Nenhuma avaliação ainda.
         </p>
       ) : (
         <div className="space-y-4">
@@ -301,7 +301,7 @@ export function ProductReviews({ productId }: ProductReviewsProps) {
                       >
                         <CommerceImage
                           src={url}
-                          alt={`Foto da avaliacao ${idx + 1}`}
+                          alt={`Foto da avaliação ${idx + 1}`}
                           fill
                           className="object-cover"
                           sizes="80px"

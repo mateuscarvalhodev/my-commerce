@@ -5,20 +5,19 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
-import { getProductBySlug } from "@/actions/products";
-import { getProductReviews } from "@/actions/reviews";
-import { toggleWishlist, isInWishlist } from "@/actions/wishlist";
+import { createClient } from "@/lib/supabase/client";
+import { CommerceImage } from "@/components/ui/commerce-image";
+import { ProductReviews } from "@/components/ProductReviews";
+import { WishlistToggle } from "@/components/WishlistToggle";
 import { currency } from "@/utils/currency";
 import { cn } from "@/lib/utils";
 import { ProductActions } from "./product-actions";
-import { Heart, Star } from "lucide-react";
-import { toast } from "sonner";
 
 type ProductPageContentProps = {
   slug: string;
 };
 
-type Product = {
+type DbProduct = {
   id: string;
   name: string;
   slug: string;
@@ -27,18 +26,16 @@ type Product = {
   description?: string | null;
   image_url?: string | null;
   stock?: number;
-  product_images?: { url: string; alt?: string; is_primary?: boolean }[];
-  product_variants?: { id: string; name?: string; color?: string; size?: string; price_delta?: number; stock?: number }[];
   category?: { id: string; name: string } | null;
-};
-
-type Review = {
-  id: string;
-  rating: number;
-  title?: string | null;
-  comment?: string | null;
-  created_at: string;
-  user?: { name?: string | null; image_url?: string | null } | null;
+  images?: { url: string; alt?: string | null; is_primary?: boolean }[];
+  variants?: {
+    id: string;
+    name?: string | null;
+    color?: string | null;
+    size?: string | null;
+    price_delta?: number;
+    stock?: number;
+  }[];
 };
 
 function ProductPageSkeleton() {
@@ -58,27 +55,31 @@ function ProductPageSkeleton() {
 }
 
 export function ProductPageContent({ slug }: ProductPageContentProps) {
-  const [product, setProduct] = useState<Product | null>(null);
-  const [reviews, setReviews] = useState<Review[]>([]);
+  const [product, setProduct] = useState<DbProduct | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedImage, setSelectedImage] = useState(0);
-  const [inWishlist, setInWishlist] = useState(false);
 
   useEffect(() => {
     async function load() {
       try {
-        const productData = await getProductBySlug(slug);
-        setProduct(productData as Product);
+        const supabase = createClient();
+        const { data, error: queryError } = await supabase
+          .from("products")
+          .select(
+            "*, category:categories(*), images:product_images(*), variants:product_variants(*)"
+          )
+          .eq("slug", slug)
+          .single();
 
-        const [reviewsData, wishlistStatus] = await Promise.all([
-          getProductReviews(productData.id).catch(() => []),
-          isInWishlist(productData.id).catch(() => false),
-        ]);
-        setReviews(reviewsData as Review[]);
-        setInWishlist(wishlistStatus);
+        if (queryError || !data) {
+          setError("Produto não encontrado");
+          return;
+        }
+
+        setProduct(data as unknown as DbProduct);
       } catch {
-        setError("Produto nao encontrado");
+        setError("Não foi possível carregar o produto");
       } finally {
         setLoading(false);
       }
@@ -93,9 +94,9 @@ export function ProductPageContent({ slug }: ProductPageContentProps) {
   if (error || !product) {
     return (
       <main className="mx-auto max-w-4xl space-y-4 px-4 py-10">
-        <h1 className="text-2xl font-black">Produto nao encontrado</h1>
+        <h1 className="text-2xl font-black">Produto não encontrado</h1>
         <p className="text-sm text-muted-foreground">
-          Nao conseguimos encontrar o produto solicitado.
+          Não conseguimos encontrar o produto solicitado.
         </p>
         <Button asChild>
           <Link href="/products">Ver outros produtos</Link>
@@ -104,7 +105,7 @@ export function ProductPageContent({ slug }: ProductPageContentProps) {
     );
   }
 
-  const images = (product.product_images ?? []).map((img) => img.url).filter(Boolean);
+  const images = (product.images ?? []).map((img) => img.url).filter(Boolean);
   if (images.length === 0 && product.image_url) {
     images.push(product.image_url);
   }
@@ -115,10 +116,10 @@ export function ProductPageContent({ slug }: ProductPageContentProps) {
   const installmentValue = product.price / installments;
 
   const sizes = Array.from(
-    new Set((product.product_variants ?? []).map((v) => v.size).filter(Boolean))
+    new Set((product.variants ?? []).map((v) => v.size).filter(Boolean))
   ) as string[];
 
-  const variants = (product.product_variants ?? []).map((v) => ({
+  const variants = (product.variants ?? []).map((v) => ({
     id: v.id,
     size: v.size ?? undefined,
     color: v.color ?? undefined,
@@ -126,31 +127,18 @@ export function ProductPageContent({ slug }: ProductPageContentProps) {
     stock: v.stock ?? 0,
   }));
 
-  async function handleToggleWishlist() {
-    try {
-      const result = await toggleWishlist(product!.id);
-      setInWishlist(result.added);
-      toast.success(result.added ? "Adicionado a lista de desejos" : "Removido da lista de desejos");
-    } catch {
-      toast.error("Faca login para usar a lista de desejos");
-    }
-  }
-
-  const avgRating =
-    reviews.length > 0
-      ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length
-      : 0;
-
   return (
     <div className="container mx-auto space-y-8 p-4 py-8">
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
         <div className="space-y-3">
           <div className="relative aspect-[3/4] overflow-hidden rounded-xl border">
             {images[selectedImage] ? (
-              <img
+              <CommerceImage
                 src={images[selectedImage]}
                 alt={product.name}
-                className="size-full object-cover"
+                fill
+                className="object-cover"
+                sizes="(max-width: 1024px) 100vw, 55vw"
               />
             ) : (
               <div className="flex size-full items-center justify-center bg-muted">
@@ -173,10 +161,12 @@ export function ProductPageContent({ slug }: ProductPageContentProps) {
                       : "border-transparent opacity-60 hover:opacity-100"
                   )}
                 >
-                  <img
+                  <CommerceImage
                     src={img}
                     alt={`${product.name} ${idx + 1}`}
-                    className="size-full object-cover"
+                    fill
+                    className="object-cover"
+                    sizes="64px"
                   />
                 </button>
               ))}
@@ -189,34 +179,14 @@ export function ProductPageContent({ slug }: ProductPageContentProps) {
             {product.name}
           </h1>
 
-          {reviews.length > 0 && (
-            <div className="flex items-center gap-2">
-              <div className="flex items-center gap-0.5">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <Star
-                    key={i}
-                    className={cn(
-                      "size-4",
-                      i < Math.round(avgRating)
-                        ? "fill-amber-400 text-amber-400"
-                        : "text-muted-foreground/30"
-                    )}
-                  />
-                ))}
-              </div>
-              <span className="text-sm text-muted-foreground">
-                ({reviews.length})
-              </span>
-            </div>
-          )}
-
           <div className="space-y-1">
             <div className="flex items-baseline gap-3">
               <span className="text-2xl font-extrabold">
                 {currency(product.price)}
               </span>
 
-              {product.compare_at_price && product.compare_at_price > product.price ? (
+              {product.compare_at_price &&
+              product.compare_at_price > product.price ? (
                 <span className="text-sm text-muted-foreground line-through">
                   {currency(product.compare_at_price)}
                 </span>
@@ -227,7 +197,7 @@ export function ProductPageContent({ slug }: ProductPageContentProps) {
               </span>
             </div>
             <p className="text-sm text-muted-foreground">
-              {currency(pixPrice)} a vista no Pix
+              {currency(pixPrice)} à vista no Pix
             </p>
             <p className="text-xs text-muted-foreground">
               {installments}x de {currency(installmentValue)} sem juros
@@ -235,7 +205,9 @@ export function ProductPageContent({ slug }: ProductPageContentProps) {
           </div>
 
           {product.description ? (
-            <p className="text-sm text-muted-foreground">{product.description}</p>
+            <p className="text-sm text-muted-foreground">
+              {product.description}
+            </p>
           ) : null}
           <Separator />
 
@@ -244,79 +216,22 @@ export function ProductPageContent({ slug }: ProductPageContentProps) {
               id: product.id,
               title: product.name,
               price: product.price,
+              image: {
+                src: images[0] ?? product.image_url ?? "",
+                alt: product.name,
+              },
             }}
             sizes={sizes}
             variants={variants}
           />
 
-          <button
-            type="button"
-            onClick={() => void handleToggleWishlist()}
-            className={cn(
-              "flex items-center gap-2 text-sm transition-colors",
-              inWishlist
-                ? "text-red-500"
-                : "text-muted-foreground hover:text-red-500"
-            )}
-          >
-            <Heart className={cn("size-5", inWishlist && "fill-current")} />
-            {inWishlist ? "Na lista de desejos" : "Adicionar a lista de desejos"}
-          </button>
+          <WishlistToggle productId={String(product.id)} />
         </div>
       </div>
 
       <Separator />
 
-      {/* Reviews */}
-      <section>
-        <h2 className="text-xl font-bold">
-          Avaliacoes ({reviews.length})
-        </h2>
-        {reviews.length === 0 ? (
-          <p className="mt-4 text-sm text-muted-foreground">
-            Nenhuma avaliacao ainda.
-          </p>
-        ) : (
-          <div className="mt-4 space-y-4">
-            {reviews.map((review) => (
-              <div
-                key={review.id}
-                className="rounded-xl border bg-white p-4 shadow-sm"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-0.5">
-                    {Array.from({ length: 5 }).map((_, i) => (
-                      <Star
-                        key={i}
-                        className={cn(
-                          "size-3.5",
-                          i < review.rating
-                            ? "fill-amber-400 text-amber-400"
-                            : "text-muted-foreground/30"
-                        )}
-                      />
-                    ))}
-                  </div>
-                  <span className="text-sm font-medium">
-                    {review.user?.name ?? "Cliente"}
-                  </span>
-                  <span className="text-xs text-muted-foreground">
-                    {new Date(review.created_at).toLocaleDateString("pt-BR")}
-                  </span>
-                </div>
-                {review.title && (
-                  <p className="mt-2 font-semibold">{review.title}</p>
-                )}
-                {review.comment && (
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    {review.comment}
-                  </p>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
+      <ProductReviews productId={String(product.id)} />
     </div>
   );
 }

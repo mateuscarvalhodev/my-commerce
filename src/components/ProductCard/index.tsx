@@ -203,7 +203,7 @@ export const ProductCard = ({
               <ShoppingBag
                 className={cn("mr-2", isCompact ? "size-3.5" : "size-4")}
               />
-              Comprar agora
+              Eu Quero
             </Button>
           </div>
         </CardContent>

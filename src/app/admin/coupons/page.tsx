@@ -151,7 +151,7 @@ export default function AdminCouponsPage() {
           </div>
           <form onSubmit={handleSubmit} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <div>
-              <Label htmlFor="code">Codigo</Label>
+              <Label htmlFor="code">Código</Label>
               <Input
                 id="code"
                 value={code}
@@ -187,7 +187,7 @@ export default function AdminCouponsPage() {
               />
             </div>
             <div>
-              <Label htmlFor="min_order_value">Pedido Minimo</Label>
+              <Label htmlFor="min_order_value">Pedido Mínimo</Label>
               <Input
                 id="min_order_value"
                 type="number"
@@ -198,7 +198,7 @@ export default function AdminCouponsPage() {
               />
             </div>
             <div>
-              <Label htmlFor="max_uses">Usos Maximos</Label>
+              <Label htmlFor="max_uses">Usos Máximos</Label>
               <Input
                 id="max_uses"
                 type="number"
@@ -246,13 +246,13 @@ export default function AdminCouponsPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b bg-muted/50">
-                <th className="px-4 py-3 text-left font-medium">Codigo</th>
+                <th className="px-4 py-3 text-left font-medium">Código</th>
                 <th className="px-4 py-3 text-left font-medium">Tipo</th>
                 <th className="px-4 py-3 text-left font-medium">Valor</th>
                 <th className="px-4 py-3 text-left font-medium">Usos</th>
                 <th className="px-4 py-3 text-left font-medium">Status</th>
                 <th className="px-4 py-3 text-left font-medium">Expira</th>
-                <th className="px-4 py-3 text-left font-medium">Acoes</th>
+                <th className="px-4 py-3 text-left font-medium">Ações</th>
               </tr>
             </thead>
             <tbody>

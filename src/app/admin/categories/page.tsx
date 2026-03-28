@@ -137,7 +137,7 @@ export default function AdminCategoriesPage() {
         .delete()
         .eq("id", categoryId);
       if (error) throw error;
-      toast.success("Categoria excluida");
+      toast.success("Categoria excluída");
       await loadCategories();
     } catch {
       toast.error("Erro ao excluir categoria");
@@ -173,9 +173,9 @@ export default function AdminCategoriesPage() {
             <thead>
               <tr className="border-b bg-muted/50">
                 <th className="px-4 py-3 text-left font-medium">Nome</th>
-                <th className="px-4 py-3 text-left font-medium">Descricao</th>
+                <th className="px-4 py-3 text-left font-medium">Descrição</th>
                 <th className="px-4 py-3 text-left font-medium">Slug</th>
-                <th className="px-4 py-3 text-right font-medium">Acoes</th>
+                <th className="px-4 py-3 text-right font-medium">Ações</th>
               </tr>
             </thead>
             <tbody>
@@ -235,14 +235,14 @@ export default function AdminCategoriesPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="category-description">Descricao</Label>
+              <Label htmlFor="category-description">Descrição</Label>
               <textarea
                 id="category-description"
                 value={form.description}
                 onChange={(e) =>
                   setForm((f) => ({ ...f, description: e.target.value }))
                 }
-                placeholder="Descricao opcional"
+                placeholder="Descrição opcional"
                 rows={3}
                 className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               />

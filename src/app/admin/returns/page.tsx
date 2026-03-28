@@ -68,7 +68,7 @@ export default function AdminReturnsPage() {
       if (error) throw error;
       setReturns((data ?? []) as ReturnItem[]);
     } catch {
-      toast.error("Erro ao carregar devolucoes");
+      toast.error("Erro ao carregar devoluções");
     } finally {
       setLoading(false);
     }
@@ -83,10 +83,10 @@ export default function AdminReturnsPage() {
         .eq("id", id);
 
       if (error) throw error;
-      toast.success("Devolucao atualizada");
+      toast.success("Devolução atualizada");
       await loadReturns();
     } catch {
-      toast.error("Erro ao atualizar devolucao");
+      toast.error("Erro ao atualizar devolução");
     }
   }
 
@@ -94,7 +94,7 @@ export default function AdminReturnsPage() {
     <div className="space-y-6">
       <div className="flex items-center gap-2">
         <RotateCcw className="size-5" />
-        <h1 className="text-2xl font-bold">Devolucoes</h1>
+        <h1 className="text-2xl font-bold">Devoluções</h1>
       </div>
 
       <div className="flex gap-1 rounded-lg border p-1 w-fit overflow-x-auto">
@@ -122,7 +122,7 @@ export default function AdminReturnsPage() {
         </div>
       ) : returns.length === 0 ? (
         <p className="py-8 text-center text-sm text-muted-foreground">
-          Nenhuma devolucao encontrada.
+          Nenhuma devolução encontrada.
         </p>
       ) : (
         <div className="overflow-x-auto rounded-lg border">
@@ -133,7 +133,7 @@ export default function AdminReturnsPage() {
                 <th className="px-4 py-3 text-left font-medium">Motivo</th>
                 <th className="px-4 py-3 text-left font-medium">Status</th>
                 <th className="px-4 py-3 text-left font-medium">Data</th>
-                <th className="px-4 py-3 text-left font-medium">Acoes</th>
+                <th className="px-4 py-3 text-left font-medium">Ações</th>
               </tr>
             </thead>
             <tbody>

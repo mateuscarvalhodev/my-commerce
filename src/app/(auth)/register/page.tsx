@@ -66,7 +66,7 @@ export default function RegisterPage() {
       </form>
 
       <div className="mt-6 text-center text-sm">
-        <span className="text-muted-foreground">Ja tem conta? </span>
+        <span className="text-muted-foreground">Já tem conta? </span>
         <Link href="/login" className="text-primary hover:underline">
           Entrar
         </Link>

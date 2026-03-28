@@ -9,7 +9,7 @@ import { createClient } from "@/lib/supabase/client";
 
 const accountNav = [
   { href: "/account", label: "Minha conta", icon: User, exact: true },
-  { href: "/account/addresses", label: "Enderecos", icon: MapPin },
+  { href: "/account/addresses", label: "Endereços", icon: MapPin },
   { href: "/account/orders", label: "Pedidos", icon: Package },
   { href: "/account/wishlist", label: "Lista de desejos", icon: Heart },
 ];
@@ -39,7 +39,7 @@ export default function AccountLayout({
     return (
       <main className="flex min-h-[60vh] items-center justify-center">
         <div className="text-center space-y-4">
-          <p className="text-muted-foreground">Voce precisa estar logado</p>
+          <p className="text-muted-foreground">Você precisa estar logado</p>
           <Link
             href="/login"
             className="inline-block rounded-lg bg-primary px-6 py-2 text-primary-foreground font-semibold"

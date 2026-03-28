@@ -2,8 +2,8 @@
 
 import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
-import { addToCart } from "@/actions/cart";
-import { toast } from "sonner";
+import { useCart } from "@/context/cart-context";
+import type { CommerceImageSource } from "@/lib/commerce/types";
 
 type ProductVariant = {
   id: string;
@@ -15,9 +15,10 @@ type ProductVariant = {
 
 type ProductActionsProps = {
   product: {
-    id: string;
+    id: string | number;
     title: string;
     price: number;
+    image: CommerceImageSource;
   };
   sizes?: string[];
   variants?: ProductVariant[];
@@ -32,31 +33,35 @@ export function ProductActions({
   variants = [],
   defaultSize,
 }: ProductActionsProps) {
+  const { addItem } = useCart();
   const hasSizes = sizes.length > 0;
   const defaultSelected = defaultSize ?? sizes[0] ?? DEFAULT_SIZE;
   const [size, setSize] = useState<string>(defaultSelected);
   const [qty, setQty] = useState<number>(1);
-  const [adding, setAdding] = useState(false);
 
   const selectedVariant = useMemo(() => {
     if (!hasSizes || variants.length === 0) return null;
     return variants.find((v) => (v.size ?? v.color) === size) ?? null;
   }, [size, variants, hasSizes]);
 
-  const disabled = qty < 1 || (hasSizes && !size) || adding;
+  const effectivePrice = selectedVariant
+    ? product.price + selectedVariant.priceDelta
+    : product.price;
+
+  const disabled = qty < 1 || (hasSizes && !size);
 
   async function handleBuy() {
     if (disabled) return;
 
-    setAdding(true);
-    try {
-      await addToCart(product.id, qty, selectedVariant?.id);
-      toast.success("Produto adicionado ao carrinho!");
-    } catch {
-      toast.error("Faca login para adicionar ao carrinho");
-    } finally {
-      setAdding(false);
-    }
+    await addItem({
+      id: product.id,
+      title: product.title,
+      price: effectivePrice,
+      image: product.image,
+      size: hasSizes ? size : undefined,
+      variantId: selectedVariant?.id,
+      qty,
+    });
   }
 
   return (
@@ -82,7 +87,7 @@ export function ProductActions({
           </div>
         </div>
       ) : (
-        <p className="text-sm text-muted-foreground">Tamanho padrao</p>
+        <p className="text-sm text-muted-foreground">Tamanho padrão</p>
       )}
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -110,7 +115,7 @@ export function ProductActions({
           disabled={disabled}
           onClick={() => void handleBuy()}
         >
-          {adding ? "Adicionando..." : "Comprar"}
+          Comprar
         </Button>
       </div>
     </div>
