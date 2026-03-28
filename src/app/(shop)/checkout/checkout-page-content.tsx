@@ -121,9 +121,31 @@ export function CheckoutPageContent() {
     if (addr) await fetchShipping(addr.zip_code);
   }
 
+  const [cepLoading, setCepLoading] = useState(false);
+
   async function handleGuestCepBlur() {
     const clean = guestCep.replace(/\D/g, "");
-    if (clean.length === 8) await fetchShipping(clean);
+    if (clean.length !== 8) return;
+
+    // Auto-fill address via ViaCEP
+    setCepLoading(true);
+    try {
+      const res = await fetch(`https://viacep.com.br/ws/${clean}/json/`);
+      if (res.ok) {
+        const data = await res.json();
+        if (!data.erro) {
+          setGuestStreet(data.logradouro || "");
+          setGuestNeighborhood(data.bairro || "");
+          setGuestCity(data.localidade || "");
+          setGuestState(data.uf || "");
+        }
+      }
+    } catch {} finally {
+      setCepLoading(false);
+    }
+
+    // Also fetch shipping
+    await fetchShipping(clean);
   }
 
   async function fetchShipping(cep: string) {
@@ -311,9 +333,35 @@ export function CheckoutPageContent() {
               <p className="text-sm font-semibold">Endereço de entrega</p>
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="grid gap-2 sm:col-span-2">
-                  <Label>Rua *</Label>
-                  <Input value={guestStreet} onChange={(e) => setGuestStreet(e.target.value)} placeholder="Rua, Av..." required />
+                  <Label>CEP *</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      value={guestCep}
+                      onChange={(e) => setGuestCep(e.target.value)}
+                      onBlur={handleGuestCepBlur}
+                      placeholder="00000-000"
+                      maxLength={9}
+                      required
+                    />
+                    {cepLoading ? <Loader2 className="size-5 animate-spin text-muted-foreground mt-2" /> : null}
+                  </div>
                 </div>
+                {guestStreet ? (
+                  <>
+                    <div className="grid gap-2 sm:col-span-2">
+                      <Label>Rua</Label>
+                      <Input value={guestStreet} readOnly className="bg-muted/50" />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label>Bairro</Label>
+                      <Input value={guestNeighborhood} readOnly className="bg-muted/50" />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label>Cidade / UF</Label>
+                      <Input value={`${guestCity} / ${guestState}`} readOnly className="bg-muted/50" />
+                    </div>
+                  </>
+                ) : null}
                 <div className="grid gap-2">
                   <Label>Número *</Label>
                   <Input value={guestNumber} onChange={(e) => setGuestNumber(e.target.value)} placeholder="123" required />
@@ -321,22 +369,6 @@ export function CheckoutPageContent() {
                 <div className="grid gap-2">
                   <Label>Complemento</Label>
                   <Input value={guestComplement} onChange={(e) => setGuestComplement(e.target.value)} placeholder="Apto, bloco..." />
-                </div>
-                <div className="grid gap-2">
-                  <Label>Bairro *</Label>
-                  <Input value={guestNeighborhood} onChange={(e) => setGuestNeighborhood(e.target.value)} placeholder="Bairro" required />
-                </div>
-                <div className="grid gap-2">
-                  <Label>Cidade *</Label>
-                  <Input value={guestCity} onChange={(e) => setGuestCity(e.target.value)} placeholder="Cidade" required />
-                </div>
-                <div className="grid gap-2">
-                  <Label>Estado *</Label>
-                  <Input value={guestState} onChange={(e) => setGuestState(e.target.value)} placeholder="SP" maxLength={2} required />
-                </div>
-                <div className="grid gap-2">
-                  <Label>CEP *</Label>
-                  <Input value={guestCep} onChange={(e) => setGuestCep(e.target.value)} onBlur={handleGuestCepBlur} placeholder="00000-000" maxLength={9} required />
                 </div>
               </div>
             </div>
