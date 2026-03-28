@@ -22,6 +22,7 @@ import { getCart } from "@/actions/cart";
 import { getAddresses } from "@/actions/addresses";
 import { createOrder } from "@/actions/orders";
 import { createPayment } from "@/actions/payments";
+import { useCart } from "@/context/cart-context";
 import { currency } from "@/utils/currency";
 import { cn } from "@/lib/utils";
 
@@ -75,6 +76,7 @@ type ShippingOption = {
 
 export function CheckoutPageContent() {
   const router = useRouter();
+  const { syncToServer, clear: clearCart } = useCart();
   const [items, setItems] = useState<CartItem[]>([]);
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [loading, setLoading] = useState(true);
@@ -160,6 +162,9 @@ export function CheckoutPageContent() {
 
     setSubmitting(true);
     try {
+      // 0. Sync cart from localStorage to server
+      await syncToServer();
+
       // 1. Create order
       const order = await createOrder({
         paymentMethod,
@@ -193,6 +198,7 @@ export function CheckoutPageContent() {
         toast.success("Redirecionando para o pagamento...");
         window.location.href = payment.boleto_url;
       } else {
+        await clearCart();
         toast.success("Pedido criado! Complete o pagamento.");
         router.push(`/checkout/payment/${order.id}`);
       }

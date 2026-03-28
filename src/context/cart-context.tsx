@@ -26,6 +26,7 @@ type CartContextValue = {
     qty: number
   ) => Promise<void>;
   clear: () => Promise<void>;
+  syncToServer: () => Promise<void>;
   subtotal: number;
   totalQty: number;
   loading: boolean;
@@ -284,11 +285,12 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       removeItem,
       updateQty,
       clear,
+      syncToServer: () => syncCartToServer(items),
       subtotal: calculateCartSubtotal(items),
       totalQty: calculateCartQuantity(items),
       loading: serverLoading,
     }),
-    [addItem, clear, items, removeItem, serverLoading, updateQty]
+    [addItem, clear, items, removeItem, serverLoading, syncCartToServer, updateQty]
   );
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
