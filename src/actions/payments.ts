@@ -93,7 +93,7 @@ export async function createPayment(data: {
       gateway_id: pix.id ?? pix.correlationID ?? null,
       gateway_status: pix.status ?? "PENDING",
       pix_qr_code: pix.brCode ?? pix.br_code ?? null,
-      pix_qr_code_url: pix.qrCodeImage ?? pix.qrCodeUrl ?? pix.qr_code_url ?? null,
+      pix_qr_code_url: pix.qrCodeImage ?? pix.qrCodeUrl ?? pix.brCodeBase64 ?? null,
       pix_expires_at: pix.expiresAt ?? pix.expires_at ?? null,
       gateway_response: pixRes as unknown as Record<string, unknown>,
     };
