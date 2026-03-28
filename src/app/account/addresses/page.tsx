@@ -1,20 +1,26 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { Loader2, MapPin, Plus, Trash2 } from "lucide-react";
-import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
 import {
   getAddresses,
   createAddress,
+  updateAddress,
   deleteAddress,
 } from "@/actions/addresses";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { MapPin, Pencil, Trash2, Plus } from "lucide-react";
+import { toast } from "sonner";
 
-interface AddressData {
+type Address = {
   id: string;
   street: string;
   number: string;
@@ -23,26 +29,39 @@ interface AddressData {
   city: string;
   state: string;
   zip_code: string;
+  country?: string;
+};
+
+type AddressForm = {
+  street: string;
+  number: string;
+  complement: string;
+  neighborhood: string;
+  city: string;
+  state: string;
+  zip_code: string;
   country: string;
-  is_default?: boolean;
-}
+};
+
+const emptyForm: AddressForm = {
+  street: "",
+  number: "",
+  complement: "",
+  neighborhood: "",
+  city: "",
+  state: "",
+  zip_code: "",
+  country: "BR",
+};
 
 export default function AddressesPage() {
-  const router = useRouter();
-  const [addresses, setAddresses] = useState<AddressData[]>([]);
+  const [addresses, setAddresses] = useState<Address[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [form, setForm] = useState<AddressForm>(emptyForm);
+  const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-
-  // Form fields
-  const [street, setStreet] = useState("");
-  const [number, setNumber] = useState("");
-  const [complement, setComplement] = useState("");
-  const [neighborhood, setNeighborhood] = useState("");
-  const [city, setCity] = useState("");
-  const [state, setState] = useState("");
-  const [zipCode, setZipCode] = useState("");
 
   useEffect(() => {
     loadAddresses();
@@ -51,69 +70,80 @@ export default function AddressesPage() {
   async function loadAddresses() {
     try {
       const data = await getAddresses();
-      setAddresses(data as any);
+      setAddresses(data as Address[]);
     } catch {
-      toast.error("Erro ao carregar enderecos");
+      // Not authenticated
     } finally {
       setLoading(false);
     }
   }
 
-  function resetForm() {
-    setStreet("");
-    setNumber("");
-    setComplement("");
-    setNeighborhood("");
-    setCity("");
-    setState("");
-    setZipCode("");
-    setShowForm(false);
+  function openNew() {
+    setEditingId(null);
+    setForm(emptyForm);
+    setDialogOpen(true);
   }
 
-  async function handleCreate(e: React.FormEvent) {
-    e.preventDefault();
-    setSubmitting(true);
+  function openEdit(addr: Address) {
+    setEditingId(addr.id);
+    setForm({
+      street: addr.street ?? "",
+      number: addr.number ?? "",
+      complement: addr.complement ?? "",
+      neighborhood: addr.neighborhood ?? "",
+      city: addr.city ?? "",
+      state: addr.state ?? "",
+      zip_code: addr.zip_code ?? "",
+      country: addr.country ?? "BR",
+    });
+    setDialogOpen(true);
+  }
+
+  async function handleSave() {
+    setSaving(true);
     try {
-      const newAddress = await createAddress({
-        street,
-        number,
-        complement: complement || undefined,
-        neighborhood,
-        city,
-        state,
-        zip_code: zipCode,
-      });
-      setAddresses((prev) => [newAddress as any, ...prev]);
-      resetForm();
-      toast.success("Endereco adicionado com sucesso");
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Erro ao criar endereco"
-      );
+      if (editingId) {
+        const updated = await updateAddress(editingId, form);
+        setAddresses((prev) =>
+          prev.map((a) => (a.id === editingId ? (updated as Address) : a))
+        );
+        toast.success("Endereco atualizado!");
+      } else {
+        const created = await createAddress(form);
+        setAddresses((prev) => [created as Address, ...prev]);
+        toast.success("Endereco adicionado!");
+      }
+      setDialogOpen(false);
+    } catch {
+      toast.error("Erro ao salvar endereco");
     } finally {
-      setSubmitting(false);
+      setSaving(false);
     }
   }
 
-  async function handleDelete(addressId: string) {
-    if (!confirm("Tem certeza que deseja remover este endereco?")) return;
-
-    setDeletingId(addressId);
+  async function handleDelete(id: string) {
+    setDeletingId(id);
     try {
-      await deleteAddress(addressId);
-      setAddresses((prev) => prev.filter((a) => a.id !== addressId));
-      toast.success("Endereco removido");
-    } catch (error) {
+      await deleteAddress(id);
+      setAddresses((prev) => prev.filter((a) => a.id !== id));
+      toast.success("Endereco removido!");
+    } catch {
       toast.error("Erro ao remover endereco");
     } finally {
       setDeletingId(null);
     }
   }
 
+  function updateField(field: keyof AddressForm, value: string) {
+    setForm((prev) => ({ ...prev, [field]: value }));
+  }
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-16">
-        <Loader2 className="size-8 animate-spin opacity-60" />
+      <div className="space-y-3">
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-24 w-full" />
+        <Skeleton className="h-24 w-full" />
       </div>
     );
   }
@@ -121,167 +151,127 @@ export default function AddressesPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-black tracking-tight">Enderecos</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Gerencie seus enderecos de entrega
-          </p>
-        </div>
-        <Button
-          onClick={() => setShowForm(!showForm)}
-          variant={showForm ? "outline" : "default"}
-        >
+        <h1 className="text-xl font-bold">Enderecos</h1>
+        <Button size="sm" onClick={openNew}>
           <Plus className="mr-1 size-4" />
-          {showForm ? "Cancelar" : "Novo endereco"}
+          Novo endereco
         </Button>
       </div>
 
-      {/* Add form */}
-      {showForm ? (
-        <form
-          onSubmit={handleCreate}
-          className="space-y-4 rounded-xl border bg-white p-5 shadow-sm"
-        >
-          <h3 className="font-semibold">Novo endereco</h3>
-
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="grid gap-2 sm:col-span-2">
-              <Label htmlFor="street">Rua</Label>
-              <Input
-                id="street"
-                value={street}
-                onChange={(e) => setStreet(e.target.value)}
-                placeholder="Rua, Avenida, etc."
-                required
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="number">Numero</Label>
-              <Input
-                id="number"
-                value={number}
-                onChange={(e) => setNumber(e.target.value)}
-                placeholder="123"
-                required
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="complement">Complemento</Label>
-              <Input
-                id="complement"
-                value={complement}
-                onChange={(e) => setComplement(e.target.value)}
-                placeholder="Apto 101"
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="neighborhood">Bairro</Label>
-              <Input
-                id="neighborhood"
-                value={neighborhood}
-                onChange={(e) => setNeighborhood(e.target.value)}
-                placeholder="Centro"
-                required
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="city">Cidade</Label>
-              <Input
-                id="city"
-                value={city}
-                onChange={(e) => setCity(e.target.value)}
-                placeholder="Sao Paulo"
-                required
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="state">Estado</Label>
-              <Input
-                id="state"
-                value={state}
-                onChange={(e) => setState(e.target.value)}
-                placeholder="SP"
-                maxLength={2}
-                required
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="zip_code">CEP</Label>
-              <Input
-                id="zip_code"
-                value={zipCode}
-                onChange={(e) => setZipCode(e.target.value)}
-                placeholder="00000-000"
-                required
-              />
-            </div>
-          </div>
-
-          <div className="flex justify-end gap-2">
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={resetForm}
-            >
-              Cancelar
-            </Button>
-            <Button type="submit" disabled={submitting}>
-              {submitting ? (
-                <Loader2 className="mr-2 size-4 animate-spin" />
-              ) : null}
-              Salvar endereco
-            </Button>
-          </div>
-        </form>
-      ) : null}
-
-      {/* Addresses list */}
-      {addresses.length === 0 && !showForm ? (
-        <div className="flex flex-col items-center gap-4 py-16 text-center">
-          <MapPin className="size-12 text-muted-foreground/50" />
-          <p className="text-muted-foreground">
-            Nenhum endereco cadastrado.
-          </p>
-        </div>
+      {addresses.length === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          Nenhum endereco cadastrado.
+        </p>
       ) : (
-        <div className="space-y-3">
+        <div className="grid gap-3 sm:grid-cols-2">
           {addresses.map((addr) => (
             <div
               key={addr.id}
-              className="flex items-start justify-between gap-4 rounded-xl border bg-white p-4 shadow-sm"
+              className="flex gap-3 rounded-lg border p-4"
             >
-              <div className="flex items-start gap-3">
-                <MapPin className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-                <div>
-                  <p className="font-medium">
-                    {addr.street}, {addr.number}
-                    {addr.complement ? ` - ${addr.complement}` : ""}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    {addr.neighborhood} - {addr.city}/{addr.state}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    CEP: {addr.zip_code}
-                  </p>
-                </div>
+              <MapPin className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+              <div className="flex-1 space-y-1 text-sm">
+                <p className="font-medium">
+                  {addr.street}, {addr.number}
+                  {addr.complement ? ` - ${addr.complement}` : ""}
+                </p>
+                <p className="text-muted-foreground">
+                  {addr.neighborhood} - {addr.city}/{addr.state}
+                </p>
+                <p className="text-muted-foreground">CEP: {addr.zip_code}</p>
               </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                disabled={deletingId === addr.id}
-                onClick={() => handleDelete(addr.id)}
-                className="text-muted-foreground hover:text-destructive"
-              >
-                {deletingId === addr.id ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
+              <div className="flex flex-col gap-1">
+                <button
+                  onClick={() => openEdit(addr)}
+                  className="rounded p-1 text-muted-foreground hover:text-foreground"
+                >
+                  <Pencil className="size-4" />
+                </button>
+                <button
+                  onClick={() => void handleDelete(addr.id)}
+                  className="rounded p-1 text-muted-foreground hover:text-red-600"
+                  disabled={deletingId === addr.id}
+                >
                   <Trash2 className="size-4" />
-                )}
-              </Button>
+                </button>
+              </div>
             </div>
           ))}
         </div>
       )}
+
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {editingId ? "Editar endereco" : "Novo endereco"}
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="grid gap-3">
+            <div className="grid grid-cols-[1fr_100px] gap-3">
+              <div className="space-y-1">
+                <Label>Rua</Label>
+                <Input
+                  value={form.street}
+                  onChange={(e) => updateField("street", e.target.value)}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>Numero</Label>
+                <Input
+                  value={form.number}
+                  onChange={(e) => updateField("number", e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label>Complemento</Label>
+              <Input
+                value={form.complement}
+                onChange={(e) => updateField("complement", e.target.value)}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>Bairro</Label>
+              <Input
+                value={form.neighborhood}
+                onChange={(e) => updateField("neighborhood", e.target.value)}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label>Cidade</Label>
+                <Input
+                  value={form.city}
+                  onChange={(e) => updateField("city", e.target.value)}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>Estado</Label>
+                <Input
+                  value={form.state}
+                  onChange={(e) => updateField("state", e.target.value)}
+                  maxLength={2}
+                  placeholder="SP"
+                />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label>CEP</Label>
+              <Input
+                value={form.zip_code}
+                onChange={(e) => updateField("zip_code", e.target.value)}
+                placeholder="00000-000"
+              />
+            </div>
+
+            <Button onClick={() => void handleSave()} disabled={saving}>
+              {saving ? "Salvando..." : "Salvar"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

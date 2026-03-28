@@ -1,47 +1,85 @@
-import Link from "next/link";
-import { User, Package, MapPin, Heart } from "lucide-react";
-import { requireAuth } from "@/lib/supabase/auth";
+"use client";
 
-const NAV_ITEMS = [
-  { href: "/account", label: "Perfil", icon: User },
-  { href: "/account/orders", label: "Pedidos", icon: Package },
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
+import { cn } from "@/lib/utils";
+import { User, MapPin, Package, Heart } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
+
+const accountNav = [
+  { href: "/account", label: "Minha conta", icon: User, exact: true },
   { href: "/account/addresses", label: "Enderecos", icon: MapPin },
-  { href: "/account/wishlist", label: "Wishlist", icon: Heart },
+  { href: "/account/orders", label: "Pedidos", icon: Package },
+  { href: "/account/wishlist", label: "Lista de desejos", icon: Heart },
 ];
 
-export default async function AccountLayout({
+export default function AccountLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  await requireAuth();
+  const pathname = usePathname();
+  const [isSignedIn, setIsSignedIn] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    async function checkAuth() {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      setIsSignedIn(!!user);
+    }
+    checkAuth();
+  }, []);
+
+  if (isSignedIn === null) {
+    return null; // Loading
+  }
+
+  if (!isSignedIn) {
+    return (
+      <main className="flex min-h-[60vh] items-center justify-center">
+        <div className="text-center space-y-4">
+          <p className="text-muted-foreground">Voce precisa estar logado</p>
+          <Link
+            href="/login"
+            className="inline-block rounded-lg bg-primary px-6 py-2 text-primary-foreground font-semibold"
+          >
+            Entrar
+          </Link>
+        </div>
+      </main>
+    );
+  }
 
   return (
-    <main className="mx-auto max-w-7xl px-4 py-8">
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[220px_1fr]">
-        {/* Sidebar */}
-        <aside className="space-y-1 rounded-xl border bg-white p-3 shadow-sm lg:h-fit">
-          <h2 className="mb-3 px-3 text-sm font-semibold text-muted-foreground">
-            Minha conta
-          </h2>
-          {NAV_ITEMS.map((item) => {
-            const Icon = item.icon;
+    <div className="container mx-auto px-4 py-6">
+      <div className="grid gap-6 lg:grid-cols-[220px_1fr]">
+        <nav className="flex gap-2 overflow-x-auto lg:flex-col lg:overflow-visible">
+          {accountNav.map((item) => {
+            const isActive = item.exact
+              ? pathname === item.href
+              : pathname.startsWith(item.href);
+
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors hover:bg-muted"
+                className={cn(
+                  "flex items-center gap-2 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                  isActive
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:bg-muted"
+                )}
               >
-                <Icon className="size-4 text-muted-foreground" />
+                <item.icon className="size-4" />
                 {item.label}
               </Link>
             );
           })}
-        </aside>
+        </nav>
 
-        {/* Content */}
-        <div>{children}</div>
+        <main className="min-w-0">{children}</main>
       </div>
-    </main>
+    </div>
   );
 }

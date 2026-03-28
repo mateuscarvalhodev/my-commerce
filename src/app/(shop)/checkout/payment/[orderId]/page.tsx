@@ -2,6 +2,7 @@
 
 import { use, useEffect, useState, useCallback } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Loader2,
   CheckCircle2,
@@ -16,7 +17,8 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { getPaymentByOrder } from "@/actions/payments";
-import { currency, cn } from "@/lib/utils";
+import { currency } from "@/utils/currency";
+import { cn } from "@/lib/utils";
 
 export default function PaymentPage({
   params,
@@ -24,6 +26,7 @@ export default function PaymentPage({
   params: Promise<{ orderId: string }>;
 }) {
   const { orderId } = use(params);
+  const router = useRouter();
 
   const [payment, setPayment] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -121,7 +124,7 @@ export default function PaymentPage({
           <div>
             <h1 className="text-2xl font-black">Pagamento recusado</h1>
             <p className="mt-2 text-muted-foreground">
-              O pagamento nao foi aprovado. Tente novamente.
+              {payment.error_message ?? "O pagamento nao foi aprovado. Tente novamente."}
             </p>
           </div>
           <Button asChild>
@@ -132,10 +135,7 @@ export default function PaymentPage({
     );
   }
 
-  const meta = payment.metadata as Record<string, any> | null;
-  const amountFormatted = currency(
-    payment.amount_cents ? payment.amount_cents / 100 : payment.amount ?? 0
-  );
+  const amountFormatted = currency((payment.amount_cents ?? 0) / 100);
 
   return (
     <main className="mx-auto max-w-lg px-4 py-10">
@@ -161,17 +161,17 @@ export default function PaymentPage({
               Pague com PIX
             </div>
 
-            {(payment.pix_qr_code_url || meta?.pix_qr_code_url) ? (
+            {payment.pix_qr_code_url ? (
               <div className="flex justify-center">
                 <img
-                  src={payment.pix_qr_code_url ?? meta?.pix_qr_code_url}
+                  src={payment.pix_qr_code_url}
                   alt="QR Code PIX"
                   className="size-52 rounded-lg border"
                 />
               </div>
             ) : null}
 
-            {(payment.pix_qr_code || meta?.pix_qr_code) ? (
+            {payment.pix_qr_code ? (
               <div className="space-y-2">
                 <p className="text-xs text-muted-foreground">
                   Ou copie o codigo PIX:
@@ -179,18 +179,14 @@ export default function PaymentPage({
                 <div className="flex gap-2">
                   <input
                     readOnly
-                    value={payment.pix_qr_code ?? meta?.pix_qr_code}
+                    value={payment.pix_qr_code}
                     className="flex-1 truncate rounded-md border bg-muted/50 px-3 py-2 text-xs"
                   />
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={() =>
-                      copyToClipboard(
-                        payment.pix_qr_code ?? meta?.pix_qr_code
-                      )
-                    }
+                    onClick={() => copyToClipboard(payment.pix_qr_code!)}
                   >
                     <Copy className="size-4" />
                   </Button>
@@ -198,12 +194,10 @@ export default function PaymentPage({
               </div>
             ) : null}
 
-            {(payment.pix_expires_at || meta?.pix_expires_at) ? (
+            {payment.pix_expires_at ? (
               <p className="text-xs text-muted-foreground">
                 Expira em:{" "}
-                {new Date(
-                  payment.pix_expires_at ?? meta?.pix_expires_at
-                ).toLocaleString("pt-BR")}
+                {new Date(payment.pix_expires_at).toLocaleString("pt-BR")}
               </p>
             ) : null}
           </div>
@@ -217,7 +211,7 @@ export default function PaymentPage({
               Boleto bancario
             </div>
 
-            {(payment.boleto_barcode || meta?.boleto_barcode) ? (
+            {payment.boleto_barcode ? (
               <div className="space-y-2">
                 <p className="text-xs text-muted-foreground">
                   Codigo de barras:
@@ -225,20 +219,14 @@ export default function PaymentPage({
                 <div className="flex gap-2">
                   <input
                     readOnly
-                    value={
-                      payment.boleto_barcode ?? meta?.boleto_barcode
-                    }
+                    value={payment.boleto_barcode}
                     className="flex-1 truncate rounded-md border bg-muted/50 px-3 py-2 text-xs font-mono"
                   />
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={() =>
-                      copyToClipboard(
-                        payment.boleto_barcode ?? meta?.boleto_barcode
-                      )
-                    }
+                    onClick={() => copyToClipboard(payment.boleto_barcode!)}
                   >
                     <Copy className="size-4" />
                   </Button>
@@ -246,10 +234,10 @@ export default function PaymentPage({
               </div>
             ) : null}
 
-            {(payment.boleto_url || meta?.boleto_url) ? (
+            {payment.boleto_url ? (
               <Button asChild variant="outline" className="w-full">
                 <a
-                  href={payment.boleto_url ?? meta?.boleto_url}
+                  href={payment.boleto_url}
                   target="_blank"
                   rel="noopener noreferrer"
                 >
@@ -259,12 +247,10 @@ export default function PaymentPage({
               </Button>
             ) : null}
 
-            {(payment.boleto_due_date || meta?.boleto_due_date) ? (
+            {payment.boleto_due_date ? (
               <p className="text-xs text-muted-foreground">
                 Vencimento:{" "}
-                {new Date(
-                  payment.boleto_due_date ?? meta?.boleto_due_date
-                ).toLocaleDateString("pt-BR")}
+                {new Date(payment.boleto_due_date).toLocaleDateString("pt-BR")}
               </p>
             ) : null}
           </div>
@@ -278,11 +264,11 @@ export default function PaymentPage({
             <span
               className={cn(
                 "font-medium",
-                payment.status === "pending" && "text-amber-600",
+                (payment.status === "pending" || payment.status === "waiting_payment") && "text-amber-600",
                 payment.status === "processing" && "text-blue-600"
               )}
             >
-              {payment.status === "pending"
+              {payment.status === "pending" || payment.status === "waiting_payment"
                 ? "Aguardando pagamento"
                 : payment.status === "processing"
                   ? "Processando"
@@ -292,8 +278,12 @@ export default function PaymentPage({
           <Loader2 className="size-3 animate-spin" />
         </div>
 
-        <Button variant="ghost" className="w-full" asChild>
-          <Link href="/account/orders">Ver meus pedidos</Link>
+        <Button
+          variant="ghost"
+          className="w-full"
+          onClick={() => router.push("/account/orders")}
+        >
+          Ver meus pedidos
         </Button>
       </div>
     </main>
