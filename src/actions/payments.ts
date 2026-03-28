@@ -108,10 +108,13 @@ export async function createPayment(data: {
 
     const completionUrl = `${process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"}/checkout/payment/${order.id}`;
 
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+
     const billingRes = await createBilling({
       frequency: "ONE_TIME",
       methods: ["PIX"],
       products,
+      returnUrl: `${siteUrl}/account/orders`,
       completionUrl,
       customerId: customerRes.data.id,
       metadata: { order_id: order.id },

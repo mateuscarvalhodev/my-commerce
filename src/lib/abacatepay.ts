@@ -94,8 +94,8 @@ export interface CreateBillingInput {
   frequency: BillingFrequency;
   methods: BillingMethod[];
   products: BillingProduct[];
-  returnUrl?: string;
-  completionUrl?: string;
+  returnUrl: string;
+  completionUrl: string;
   customerId?: string;
   metadata?: Record<string, string>;
 }
