@@ -53,7 +53,7 @@ const DEFAULT_SERVICE_CODES = ['04014', '04510'];
 const DEFAULT_ORIGIN_CEP = process.env.STORE_CEP || '01001000';
 
 // Free shipping threshold (R$)
-const FREE_SHIPPING_ABOVE = Number(process.env.FREE_SHIPPING_ABOVE) || 299;
+const FREE_SHIPPING_ABOVE = Number(process.env.FREE_SHIPPING_ABOVE) || 999;
 
 // --- Correios API ------------------------------------------------------------
 
