@@ -7,7 +7,7 @@ import { Menu, ChevronLeft, Search, ShoppingCart } from "lucide-react";
 
 import { CartDrawer } from "@/components/CartDrawer";
 import { useCart } from "@/context/cart-context";
-import { Suspense, useState } from "react";
+import { useState } from "react";
 
 type HeaderProps = { showBack?: boolean; title?: string };
 
@@ -85,8 +85,4 @@ function HeaderInner({ showBack, title }: HeaderProps) {
   );
 }
 
-export const Header = (props: HeaderProps) => (
-  <Suspense>
-    <HeaderInner {...props} />
-  </Suspense>
-);
+export const Header = HeaderInner;
