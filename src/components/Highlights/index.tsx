@@ -1,31 +1,26 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { GenericCarousel } from "../Carousel";
-import { HighlightCard } from "../HighlightsCard";
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { ShoppingBag } from "lucide-react";
 import { Skeleton } from "../ui/skeleton";
 import { createClient } from "@/lib/supabase/client";
-import { resolveProductImage, getCategorySlug } from "@/lib/commerce/mappers";
 
-type HighlightItem = {
+type CategoryItem = {
   id: string;
-  slug: string;
-  title: string;
-  subtitle: string | undefined;
-  eyebrow: string;
-  image: { src: string; alt: string };
+  name: string;
+  slug?: string | null;
+  image_url?: string | null;
 };
 
 function HighlightsSkeleton() {
   return (
     <section className="mx-auto max-w-7xl px-4 py-6">
-      <h2 className="mb-3 text-xl font-semibold">Categorias</h2>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {Array.from({ length: 3 }).map((_, index) => (
-          <div key={index} className="overflow-hidden rounded-2xl border bg-white p-3">
-            <Skeleton className="aspect-[3/4] w-full rounded-xl" />
-            <Skeleton className="mt-3 h-5 w-2/3" />
-            <Skeleton className="mt-2 h-4 w-full" />
+      <div className="flex gap-4 overflow-x-auto pb-2">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div key={i} className="shrink-0 rounded-2xl border bg-white p-4 shadow-sm">
+            <Skeleton className="size-24 rounded-xl" />
+            <Skeleton className="mx-auto mt-2 h-4 w-16" />
           </div>
         ))}
       </div>
@@ -36,87 +31,75 @@ function HighlightsSkeleton() {
 export const Highlights = () => {
   const supabase = createClient();
   const [loading, setLoading] = useState(true);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [categories, setCategories] = useState<any[]>([]);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [products, setProducts] = useState<any[]>([]);
+  const [categories, setCategories] = useState<CategoryItem[]>([]);
 
   useEffect(() => {
     async function fetchData() {
       setLoading(true);
-      const [categoriesRes, productsRes] = await Promise.all([
-        supabase.from("categories").select("id, name, description"),
-        supabase.from("products").select("id, name, image_url, category_id"),
-      ]);
-      setCategories(categoriesRes.data ?? []);
-      setProducts(productsRes.data ?? []);
+
+      // Busca categorias + imagem do primeiro produto de cada uma
+      const { data: cats } = await supabase
+        .from("categories")
+        .select("id, name, slug");
+
+      if (!cats || cats.length === 0) {
+        setLoading(false);
+        return;
+      }
+
+      // Para cada categoria, pega a imagem do primeiro produto
+      const { data: products } = await supabase
+        .from("products")
+        .select("category_id, image_url");
+
+      const enriched: CategoryItem[] = cats.map((cat) => {
+        const match = products?.find((p) => String(p.category_id) === String(cat.id));
+        return {
+          id: String(cat.id),
+          name: cat.name,
+          slug: cat.slug,
+          image_url: match?.image_url ?? null,
+        };
+      });
+
+      setCategories(enriched);
       setLoading(false);
     }
 
     void fetchData();
   }, [supabase]);
 
-  const items = useMemo(() => {
-    return categories
-      .map((category) => {
-        const categoryId = String(category.id);
-        const title = category.name ?? "Categoria";
-        const subtitle = category.description ?? undefined;
-        const matchingProduct = products.find(
-          (product) => String(product.category_id) === categoryId
-        );
-
-        if (!categoryId) {
-          return null;
-        }
-
-        return {
-          id: categoryId,
-          slug: getCategorySlug(title, categoryId),
-          title,
-          subtitle,
-          eyebrow: "Categoria",
-          image: {
-            src: resolveProductImage(matchingProduct?.image_url),
-            alt: title,
-          },
-        } satisfies HighlightItem;
-      })
-      .filter((item): item is HighlightItem => item !== null);
-  }, [categories, products]);
-
-  if (loading) {
-    return <HighlightsSkeleton />;
-  }
-
-  if (items.length === 0) {
-    return null;
-  }
+  if (loading) return <HighlightsSkeleton />;
+  if (categories.length === 0) return null;
 
   return (
     <section className="mx-auto max-w-7xl px-4 py-6">
-      <h2 className="mb-3 text-xl font-semibold">Categorias</h2>
-
-      <GenericCarousel
-        items={items}
-        itemClassName="
-          basis-[55%]
-          sm:basis-[38%]
-          md:basis-[30%]
-          lg:basis-[24%]
-          xl:basis-[20%]
-        "
-        renderItem={(item) => (
-          <HighlightCard
-            title={item.title}
-            href={`/products?category=${item.id}`}
-            image={item.image}
-            subtitle={item.subtitle}
-            eyebrow={item.eyebrow}
-            imgAspect="square"
-          />
-        )}
-      />
+      <div className="flex gap-4 overflow-x-auto pb-2">
+        {categories.map((cat) => (
+          <Link
+            key={cat.id}
+            href={`/highlights/${cat.slug ?? cat.id}`}
+            className="shrink-0 rounded-2xl border bg-white p-4 shadow-sm transition-shadow hover:shadow-md"
+          >
+            <div className="size-24 overflow-hidden rounded-xl bg-muted">
+              {cat.image_url ? (
+                <img
+                  src={cat.image_url}
+                  alt={cat.name}
+                  className="size-full object-cover"
+                />
+              ) : (
+                <div className="flex size-full items-center justify-center">
+                  <ShoppingBag className="size-6 text-muted-foreground/30" />
+                </div>
+              )}
+            </div>
+            <p className="mt-2 text-center text-sm font-semibold">
+              {cat.name}
+            </p>
+          </Link>
+        ))}
+      </div>
     </section>
   );
 };
