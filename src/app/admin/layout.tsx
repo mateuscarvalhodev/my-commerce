@@ -6,6 +6,7 @@ import {
   Users,
   Ticket,
 } from "lucide-react";
+import { requireAdmin } from "@/lib/supabase/auth";
 
 const navItems = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
@@ -15,11 +16,13 @@ const navItems = [
   { href: "/admin/coupons", label: "Cupons", icon: Ticket },
 ];
 
-export default function AdminLayout({
+export default async function AdminLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  await requireAdmin();
+
   return (
     <div className="flex min-h-screen">
       {/* Sidebar */}

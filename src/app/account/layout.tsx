@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { User, Package, MapPin, Heart } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { requireAuth } from "@/lib/supabase/auth";
 
 const NAV_ITEMS = [
   { href: "/account", label: "Perfil", icon: User },
@@ -9,11 +9,13 @@ const NAV_ITEMS = [
   { href: "/account/wishlist", label: "Wishlist", icon: Heart },
 ];
 
-export default function AccountLayout({
+export default async function AccountLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  await requireAuth();
+
   return (
     <main className="mx-auto max-w-7xl px-4 py-8">
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[220px_1fr]">
