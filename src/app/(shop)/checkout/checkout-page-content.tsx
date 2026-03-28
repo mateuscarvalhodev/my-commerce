@@ -10,7 +10,6 @@ import {
   Plus,
   Truck,
   Package,
-  CreditCard,
   QrCode,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -25,10 +24,8 @@ import { createPayment } from "@/actions/payments";
 import { currency } from "@/utils/currency";
 import { cn } from "@/lib/utils";
 
-type PaymentMethodType = "pix" | "checkout";
-
 const PAYMENT_METHODS: {
-  value: PaymentMethodType;
+  value: string;
   label: string;
   icon: React.ElementType;
   description: string;
@@ -37,13 +34,7 @@ const PAYMENT_METHODS: {
     value: "pix",
     label: "PIX",
     icon: QrCode,
-    description: "QR Code direto, aprovação instantânea",
-  },
-  {
-    value: "checkout",
-    label: "Cartão / PIX (checkout)",
-    icon: CreditCard,
-    description: "Página segura do AbacatePay",
+    description: "QR Code instantâneo via Woovi",
   },
 ];
 
@@ -80,7 +71,7 @@ export function CheckoutPageContent() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethodType>("pix");
+  const [paymentMethod, setPaymentMethod] = useState("pix");
   const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
   const [couponCode, setCouponCode] = useState("");
   const [selectedShipping, setSelectedShipping] = useState<ShippingOption | null>(null);
@@ -173,29 +164,17 @@ export function CheckoutPageContent() {
         return;
       }
 
-      // 2. Create payment via AbacatePay
-      const paymentInput: any = {
+      // 2. Create PIX charge via Woovi
+      await createPayment({
         orderId: order.id,
         customer: {
           taxId: cleanCpf,
         },
-        payment:
-          paymentMethod === "pix"
-            ? { method: "pix", expiresIn: 3600 }
-            : { method: "checkout" },
-      };
+      });
 
-      const payment = await createPayment(paymentInput);
-
-      // 3. Redirect based on payment method
-      if (paymentMethod === "checkout" && payment?.boleto_url) {
-        // Hosted checkout — redirect to AbacatePay payment page
-        toast.success("Redirecionando para o pagamento...");
-        window.location.href = payment.boleto_url;
-      } else {
-        toast.success("Pedido criado! Complete o pagamento.");
-        router.push(`/checkout/payment/${order.id}`);
-      }
+      // 3. Redirect to payment page with QR code
+      toast.success("Pedido criado! Escaneie o QR Code PIX.");
+      router.push(`/checkout/payment/${order.id}`);
     } catch (error) {
       toast.error(
         error instanceof Error
