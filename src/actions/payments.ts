@@ -23,6 +23,7 @@ type PaymentData = PixPaymentData | BillingPaymentData;
 
 export async function createPayment(data: {
   orderId: string;
+  userId?: string; // for guest checkout
   customer: {
     email?: string;
     taxId?: string;
@@ -31,31 +32,37 @@ export async function createPayment(data: {
   };
   payment: PaymentData;
 }) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("Não autenticado");
+  const { createAdminClient } = await import("@/lib/supabase/admin");
+  const admin = createAdminClient();
 
-  // Get order with items
-  const { data: order, error: orderError } = await supabase
+  // Resolve user: from auth session or guest userId
+  let userId = data.userId;
+  if (!userId) {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Não autenticado");
+    userId = user.id;
+  }
+
+  // Get order with items (admin client to bypass RLS)
+  const { data: order, error: orderError } = await admin
     .from("orders")
     .select("*, order_items(*, product:products(*))")
     .eq("id", data.orderId)
-    .eq("user_id", user.id)
+    .eq("user_id", userId)
     .single();
 
   if (orderError || !order) throw new Error("Pedido não encontrado");
   if (order.status !== "pending") throw new Error("Pedido não está pendente");
 
   // Get profile
-  const { data: profile } = await supabase
+  const { data: profile } = await admin
     .from("profiles")
     .select("*")
-    .eq("id", user.id)
+    .eq("id", userId)
     .single();
 
-  const customerEmail = data.customer.email || user.email || "";
+  const customerEmail = data.customer.email || profile?.email || "";
   const customerName = data.customer.name || profile?.name || "Cliente";
   const amountCents = Math.round(Number(order.total) * 100);
 
@@ -133,8 +140,8 @@ export async function createPayment(data: {
     };
   }
 
-  // Save payment in DB
-  const { data: payment, error: paymentError } = await supabase
+  // Save payment in DB (admin to bypass RLS for guest)
+  const { data: payment, error: paymentError } = await admin
     .from("payments")
     .insert(paymentRecord)
     .select()
@@ -143,7 +150,7 @@ export async function createPayment(data: {
   if (paymentError) throw new Error("Erro ao salvar pagamento");
 
   // Update order
-  await supabase
+  await admin
     .from("orders")
     .update({
       payment_id: payment.id,

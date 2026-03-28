@@ -7,7 +7,6 @@ import {
   Loader2,
   ShoppingBag,
   MapPin,
-  Plus,
   Truck,
   Package,
   CreditCard,
@@ -18,11 +17,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { getCart } from "@/actions/cart";
 import { getAddresses } from "@/actions/addresses";
 import { createOrder } from "@/actions/orders";
 import { createPayment } from "@/actions/payments";
+import { guestCheckout } from "@/actions/guest-checkout";
 import { useCart } from "@/context/cart-context";
+import { createClient } from "@/lib/supabase/client";
 import { currency } from "@/utils/currency";
 import { cn } from "@/lib/utils";
 
@@ -48,14 +48,6 @@ const PAYMENT_METHODS: {
   },
 ];
 
-type CartItem = {
-  id: string;
-  quantity: number;
-  price: number;
-  product: { id: string; name: string; price: number };
-  variant?: { id: string; name?: string; size?: string; price_delta?: number } | null;
-};
-
 type Address = {
   id: string;
   street: string;
@@ -76,8 +68,9 @@ type ShippingOption = {
 
 export function CheckoutPageContent() {
   const router = useRouter();
-  const { syncToServer, clear: clearCart } = useCart();
-  const [items, setItems] = useState<CartItem[]>([]);
+  const { items: cartItems, syncToServer, clear: clearCart, subtotal } = useCart();
+
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -88,26 +81,33 @@ export function CheckoutPageContent() {
   const [selectedShipping, setSelectedShipping] = useState<ShippingOption | null>(null);
   const [shippingOptions, setShippingOptions] = useState<ShippingOption[]>([]);
   const [shippingLoading, setShippingLoading] = useState(false);
-  const [shippingSource, setShippingSource] = useState<string | null>(null);
 
   const [cpf, setCpf] = useState("");
 
-  // Credit card fields
+  // Guest fields
+  const [guestEmail, setGuestEmail] = useState("");
+  const [guestName, setGuestName] = useState("");
+  const [guestStreet, setGuestStreet] = useState("");
+  const [guestNumber, setGuestNumber] = useState("");
+  const [guestComplement, setGuestComplement] = useState("");
+  const [guestNeighborhood, setGuestNeighborhood] = useState("");
+  const [guestCity, setGuestCity] = useState("");
+  const [guestState, setGuestState] = useState("");
+  const [guestCep, setGuestCep] = useState("");
 
   useEffect(() => {
     async function load() {
-      try {
-        const [cartResult, addrsResult] = await Promise.all([
-          getCart(),
-          getAddresses(),
-        ]);
-        setItems((cartResult.items as any) ?? []);
-        setAddresses(addrsResult as Address[]);
-      } catch {
-        toast.error("Erro ao carregar dados do checkout");
-      } finally {
-        setLoading(false);
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      setIsLoggedIn(!!user);
+
+      if (user) {
+        try {
+          const addrs = await getAddresses();
+          setAddresses(addrs as Address[]);
+        } catch {}
       }
+      setLoading(false);
     }
     load();
   }, []);
@@ -116,38 +116,43 @@ export function CheckoutPageContent() {
     setSelectedAddressId(addressId);
     setSelectedShipping(null);
     setShippingOptions([]);
-    setShippingSource(null);
 
     const addr = addresses.find((a) => a.id === addressId);
-    if (!addr) return;
+    if (addr) await fetchShipping(addr.zip_code);
+  }
 
+  async function handleGuestCepBlur() {
+    const clean = guestCep.replace(/\D/g, "");
+    if (clean.length === 8) await fetchShipping(clean);
+  }
+
+  async function fetchShipping(cep: string) {
     setShippingLoading(true);
+    setSelectedShipping(null);
+    setShippingOptions([]);
     try {
-      const { getShippingOptions } = await import("@/actions/shipping");
-      const result = await getShippingOptions(addr.zip_code);
-      setShippingOptions(result.options);
-      setShippingSource(result.source ?? null);
-    } catch {
-      toast.error("Erro ao calcular frete");
-    } finally {
+      const res = await fetch("/api/shipping/calculate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          destination_cep: cep.replace(/\D/g, ""),
+          items: cartItems.map((i) => ({ product_id: String(i.id), quantity: i.qty })),
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setShippingOptions(data.options ?? []);
+      }
+    } catch {} finally {
       setShippingLoading(false);
     }
   }
 
-  const subtotal = items.reduce(
-    (sum, item) => sum + Number(item.price) * item.quantity,
-    0
-  );
   const shippingCost = selectedShipping?.price ?? 0;
   const orderTotal = subtotal + shippingCost;
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-
-    if (!selectedAddressId) {
-      toast.error("Selecione um endereço de entrega.");
-      return;
-    }
 
     if (!selectedShipping) {
       toast.error("Selecione uma opção de frete.");
@@ -160,82 +165,119 @@ export function CheckoutPageContent() {
       return;
     }
 
+    if (cartItems.length === 0) {
+      toast.error("Carrinho vazio.");
+      return;
+    }
+
     setSubmitting(true);
     try {
-      // 0. Sync cart from localStorage to server
-      await syncToServer();
+      let orderId: string;
+      let userId: string | undefined;
 
-      // 1. Create order
-      const order = await createOrder({
-        paymentMethod,
-        shippingAddressId: selectedAddressId,
-        couponCode: couponCode.trim() || undefined,
-        shippingServiceCode: selectedShipping.service_code,
-      });
+      if (isLoggedIn) {
+        if (!selectedAddressId) {
+          toast.error("Selecione um endereço de entrega.");
+          setSubmitting(false);
+          return;
+        }
 
-      if (!order?.id) {
-        toast.error("Erro ao criar o pedido.");
-        return;
+        await syncToServer();
+
+        const order = await createOrder({
+          paymentMethod,
+          shippingAddressId: selectedAddressId,
+          couponCode: couponCode.trim() || undefined,
+          shippingServiceCode: selectedShipping.service_code,
+        });
+
+        if (!order?.id) throw new Error("Erro ao criar o pedido.");
+        orderId = order.id;
+      } else {
+        if (!guestEmail.trim()) {
+          toast.error("Informe seu e-mail.");
+          setSubmitting(false);
+          return;
+        }
+        if (!guestStreet || !guestNumber || !guestNeighborhood || !guestCity || !guestState || !guestCep) {
+          toast.error("Preencha todos os campos do endereço.");
+          setSubmitting(false);
+          return;
+        }
+
+        const result = await guestCheckout({
+          email: guestEmail.trim(),
+          name: guestName.trim() || undefined,
+          items: cartItems.map((i) => ({
+            product_id: String(i.id),
+            variant_id: undefined,
+            quantity: i.qty,
+            price: i.price,
+          })),
+          address: {
+            street: guestStreet,
+            number: guestNumber,
+            complement: guestComplement || undefined,
+            neighborhood: guestNeighborhood,
+            city: guestCity,
+            state: guestState,
+            zip_code: guestCep.replace(/\D/g, ""),
+          },
+          paymentMethod,
+          couponCode: couponCode.trim() || undefined,
+          shippingServiceCode: selectedShipping.service_code,
+          cpf: cleanCpf,
+        });
+
+        orderId = result.order.id;
+        userId = result.userId;
       }
 
-      // 2. Create payment via AbacatePay v1
-      const paymentInput: any = {
-        orderId: order.id,
-        customer: {
-          taxId: cleanCpf,
-        },
+      const payment = await createPayment({
+        orderId,
+        userId,
+        customer: { taxId: cleanCpf },
         payment:
           paymentMethod === "pix"
             ? { method: "pix", expiresIn: 3600 }
             : { method: "billing" },
-      };
+      });
 
-      const payment = await createPayment(paymentInput);
+      await clearCart();
 
-      // 3. Redirect based on payment method
       if (paymentMethod === "billing" && payment?.boleto_url) {
-        // Billing link — redirect to AbacatePay payment page
         toast.success("Redirecionando para o pagamento...");
         window.location.href = payment.boleto_url;
       } else {
-        await clearCart();
         toast.success("Pedido criado! Complete o pagamento.");
-        router.push(`/checkout/payment/${order.id}`);
+        router.push(`/checkout/payment/${orderId}`);
       }
     } catch (error) {
       toast.error(
-        error instanceof Error
-          ? error.message
-          : "Não foi possível concluir o pedido."
+        error instanceof Error ? error.message : "Não foi possível concluir o pedido."
       );
     } finally {
       setSubmitting(false);
     }
   }
 
-  if (loading && items.length === 0) {
+  if (loading) {
     return (
       <main className="mx-auto max-w-4xl px-4 py-10">
         <div className="flex flex-col items-center gap-4 text-center">
           <Loader2 className="size-10 animate-spin opacity-60" />
           <h1 className="text-xl font-bold">Carregando checkout</h1>
-          <p className="text-sm text-muted-foreground">
-            Buscando os itens do carrinho antes de finalizar o pedido.
-          </p>
         </div>
       </main>
     );
   }
 
-  if (items.length === 0) {
+  if (cartItems.length === 0) {
     return (
       <main className="mx-auto max-w-4xl px-4 py-10">
         <div className="flex flex-col items-center gap-4 text-center">
           <ShoppingBag className="size-10 opacity-60" />
           <h1 className="text-xl font-bold">Não há itens para finalizar</h1>
-          <p className="text-sm text-muted-foreground">
-            Adicione produtos ao carrinho antes de finalizar a compra.
-          </p>
           <Button asChild>
             <Link href="/products">Ir para o catálogo</Link>
           </Button>
@@ -247,24 +289,66 @@ export function CheckoutPageContent() {
   return (
     <main className="mx-auto grid max-w-6xl grid-cols-1 gap-6 px-4 py-8 lg:grid-cols-[1.2fr_420px]">
       <section className="space-y-6 rounded-2xl border bg-white p-5 shadow-sm">
-        <div className="space-y-2">
-          <h1 className="text-2xl font-black tracking-tight">Fechar pedido</h1>
-        </div>
+        <h1 className="text-2xl font-black tracking-tight">Fechar pedido</h1>
 
         <form className="space-y-5" onSubmit={handleSubmit}>
-          {/* CPF / CNPJ */}
+          {/* ─── Guest info ────────────────────────────────────── */}
+          {isLoggedIn === false ? (
+            <div className="space-y-4 rounded-xl border bg-muted/30 p-4">
+              <p className="text-sm font-semibold">Seus dados</p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="grid gap-2">
+                  <Label htmlFor="guest-email">E-mail *</Label>
+                  <Input id="guest-email" type="email" required value={guestEmail} onChange={(e) => setGuestEmail(e.target.value)} placeholder="seu@email.com" />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="guest-name">Nome</Label>
+                  <Input id="guest-name" value={guestName} onChange={(e) => setGuestName(e.target.value)} placeholder="Seu nome" />
+                </div>
+              </div>
+
+              <Separator />
+              <p className="text-sm font-semibold">Endereço de entrega</p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="grid gap-2 sm:col-span-2">
+                  <Label>Rua *</Label>
+                  <Input value={guestStreet} onChange={(e) => setGuestStreet(e.target.value)} placeholder="Rua, Av..." required />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Número *</Label>
+                  <Input value={guestNumber} onChange={(e) => setGuestNumber(e.target.value)} placeholder="123" required />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Complemento</Label>
+                  <Input value={guestComplement} onChange={(e) => setGuestComplement(e.target.value)} placeholder="Apto, bloco..." />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Bairro *</Label>
+                  <Input value={guestNeighborhood} onChange={(e) => setGuestNeighborhood(e.target.value)} placeholder="Bairro" required />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Cidade *</Label>
+                  <Input value={guestCity} onChange={(e) => setGuestCity(e.target.value)} placeholder="Cidade" required />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Estado *</Label>
+                  <Input value={guestState} onChange={(e) => setGuestState(e.target.value)} placeholder="SP" maxLength={2} required />
+                </div>
+                <div className="grid gap-2">
+                  <Label>CEP *</Label>
+                  <Input value={guestCep} onChange={(e) => setGuestCep(e.target.value)} onBlur={handleGuestCepBlur} placeholder="00000-000" maxLength={9} required />
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {/* ─── CPF ─────────────────────────────────────────────── */}
           <div className="grid gap-2">
             <Label htmlFor="cpf">CPF / CNPJ</Label>
-            <Input
-              id="cpf"
-              value={cpf}
-              onChange={(e) => setCpf(e.target.value)}
-              placeholder="000.000.000-00"
-              maxLength={18}
-            />
+            <Input id="cpf" value={cpf} onChange={(e) => setCpf(e.target.value)} placeholder="000.000.000-00" maxLength={18} />
           </div>
 
-          {/* Payment method selector */}
+          {/* ─── Payment method ──────────────────────────────────── */}
           <div className="space-y-3">
             <Label>Método de pagamento</Label>
             <div className="grid gap-2">
@@ -272,23 +356,11 @@ export function CheckoutPageContent() {
                 const isSelected = paymentMethod === pm.value;
                 const Icon = pm.icon;
                 return (
-                  <button
-                    key={pm.value}
-                    type="button"
-                    onClick={() => setPaymentMethod(pm.value)}
-                    className={cn(
-                      "flex items-center gap-3 rounded-lg border p-3 text-left text-sm transition-colors",
-                      isSelected
-                        ? "border-primary bg-primary/5 ring-1 ring-primary"
-                        : "hover:bg-muted/50"
-                    )}
-                  >
+                  <button key={pm.value} type="button" onClick={() => setPaymentMethod(pm.value)} className={cn("flex items-center gap-3 rounded-lg border p-3 text-left text-sm transition-colors", isSelected ? "border-primary bg-primary/5 ring-1 ring-primary" : "hover:bg-muted/50")}>
                     <Icon className="size-5 shrink-0 text-muted-foreground" />
                     <div>
                       <p className="font-medium">{pm.label}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {pm.description}
-                      </p>
+                      <p className="text-xs text-muted-foreground">{pm.description}</p>
                     </div>
                   </button>
                 );
@@ -296,185 +368,93 @@ export function CheckoutPageContent() {
             </div>
           </div>
 
-          {/* Coupon */}
+          {/* ─── Coupon ──────────────────────────────────────────── */}
           <div className="grid gap-2">
             <Label htmlFor="coupon-code">Cupom de desconto</Label>
-            <Input
-              id="coupon-code"
-              value={couponCode}
-              onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-              placeholder="Digite o código do cupom"
-            />
+            <Input id="coupon-code" value={couponCode} onChange={(e) => setCouponCode(e.target.value.toUpperCase())} placeholder="Código do cupom" />
           </div>
 
-          {/* Address selector */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <Label>Endereço de entrega</Label>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-7 text-xs"
-                asChild
-              >
-                <Link href="/account/addresses">
-                  <Plus className="mr-1 size-3" />
-                  Gerenciar
-                </Link>
-              </Button>
-            </div>
-
-            {addresses.length === 0 ? (
-              <div className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">
-                <p>Nenhum endereço cadastrado.</p>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="mt-2"
-                  asChild
-                >
-                  <Link href="/account/addresses">Cadastrar endereço</Link>
-                </Button>
-              </div>
-            ) : (
-              <div className="grid gap-2">
-                {addresses.map((addr) => {
-                  const isSelected = selectedAddressId === addr.id;
-                  return (
-                    <button
-                      key={addr.id}
-                      type="button"
-                      onClick={() => handleAddressSelect(addr.id)}
-                      className={cn(
-                        "flex items-start gap-3 rounded-lg border p-3 text-left text-sm transition-colors",
-                        isSelected
-                          ? "border-primary bg-primary/5 ring-1 ring-primary"
-                          : "hover:bg-muted/50"
-                      )}
-                    >
-                      <MapPin className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-                      <div>
-                        <p className="font-medium">
-                          {addr.street}, {addr.number}
-                          {addr.complement ? ` - ${addr.complement}` : ""}
-                        </p>
-                        <p className="text-muted-foreground">
-                          {addr.neighborhood} - {addr.city}/{addr.state}
-                        </p>
-                        <p className="text-muted-foreground">
-                          CEP: {addr.zip_code}
-                        </p>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          {/* Shipping options */}
-          {selectedAddressId ? (
+          {/* ─── Address (logged in) ─────────────────────────────── */}
+          {isLoggedIn ? (
             <div className="space-y-3">
-              <Label className="flex items-center gap-2">
-                <Truck className="size-4" />
-                Opções de frete
-              </Label>
-
-              {shippingLoading ? (
-                <div className="flex items-center gap-2 rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
-                  <Loader2 className="size-4 animate-spin" />
-                  Calculando frete...
-                </div>
-              ) : shippingOptions.length === 0 ? (
+              <Label className="flex items-center gap-2"><MapPin className="size-4" /> Endereço de entrega</Label>
+              {addresses.length === 0 ? (
                 <div className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">
-                  Nenhuma opção de frete disponível para este endereço.
+                  <p>Nenhum endereço cadastrado.</p>
+                  <Button type="button" variant="outline" size="sm" className="mt-2" asChild>
+                    <Link href="/account/addresses">Cadastrar endereço</Link>
+                  </Button>
                 </div>
               ) : (
                 <div className="grid gap-2">
-                  {shippingOptions.map((option) => {
-                    const isSelected =
-                      selectedShipping?.service_code === option.service_code;
-                    return (
-                      <button
-                        key={option.service_code}
-                        type="button"
-                        onClick={() => setSelectedShipping(option)}
-                        className={cn(
-                          "flex items-center justify-between gap-3 rounded-lg border p-3 text-left text-sm transition-colors",
-                          isSelected
-                            ? "border-primary bg-primary/5 ring-1 ring-primary"
-                            : "hover:bg-muted/50"
-                        )}
-                      >
-                        <div className="flex items-center gap-3">
-                          <Package className="size-4 shrink-0 text-muted-foreground" />
-                          <div>
-                            <p className="font-medium">{option.service_name}</p>
-                            <p className="text-muted-foreground">
-                              {option.deadline_days === 1
-                                ? "1 dia útil"
-                                : `${option.deadline_days} dias úteis`}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          {option.price === 0 ? (
-                            <span className="font-bold text-green-600">Grátis</span>
-                          ) : (
-                            <span className="font-bold">{currency(option.price)}</span>
-                          )}
-                        </div>
-                      </button>
-                    );
-                  })}
-                  {shippingSource === "fallback" ? (
-                    <p className="text-xs text-muted-foreground">
-                      * Valores estimados. O valor final pode variar.
-                    </p>
-                  ) : null}
+                  {addresses.map((addr) => (
+                    <button key={addr.id} type="button" onClick={() => handleAddressSelect(addr.id)} className={cn("flex items-start gap-3 rounded-lg border p-3 text-left text-sm transition-colors", selectedAddressId === addr.id ? "border-primary bg-primary/5 ring-1 ring-primary" : "hover:bg-muted/50")}>
+                      <MapPin className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                      <div>
+                        <p className="font-medium">{addr.street}, {addr.number}</p>
+                        <p className="text-muted-foreground">{addr.neighborhood} - {addr.city}/{addr.state}</p>
+                        <p className="text-muted-foreground">CEP: {addr.zip_code}</p>
+                      </div>
+                    </button>
+                  ))}
                 </div>
               )}
             </div>
           ) : null}
 
-          <Button
-            type="submit"
-            className="w-full"
-            disabled={submitting || !selectedAddressId || !selectedShipping}
-          >
-            {submitting ? (
-              <Loader2 className="mr-2 size-4 animate-spin" />
-            ) : null}
+          {/* ─── Shipping ────────────────────────────────────────── */}
+          {(selectedAddressId || (!isLoggedIn && guestCep.replace(/\D/g, "").length === 8)) ? (
+            <div className="space-y-3">
+              <Label className="flex items-center gap-2"><Truck className="size-4" /> Opções de frete</Label>
+              {shippingLoading ? (
+                <div className="flex items-center gap-2 rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+                  <Loader2 className="size-4 animate-spin" /> Calculando frete...
+                </div>
+              ) : shippingOptions.length === 0 ? (
+                <div className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">
+                  Nenhuma opção de frete disponível.
+                </div>
+              ) : (
+                <div className="grid gap-2">
+                  {shippingOptions.map((opt) => (
+                    <button key={opt.service_code} type="button" onClick={() => setSelectedShipping(opt)} className={cn("flex items-center justify-between gap-3 rounded-lg border p-3 text-left text-sm transition-colors", selectedShipping?.service_code === opt.service_code ? "border-primary bg-primary/5 ring-1 ring-primary" : "hover:bg-muted/50")}>
+                      <div className="flex items-center gap-3">
+                        <Package className="size-4 shrink-0 text-muted-foreground" />
+                        <div>
+                          <p className="font-medium">{opt.service_name}</p>
+                          <p className="text-muted-foreground">{opt.deadline_days === 1 ? "1 dia útil" : `${opt.deadline_days} dias úteis`}</p>
+                        </div>
+                      </div>
+                      <span className="font-bold">{opt.price === 0 ? <span className="text-green-600">Grátis</span> : currency(opt.price)}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : null}
+
+          <Button type="submit" className="w-full" disabled={submitting || !selectedShipping}>
+            {submitting ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
             {submitting ? "Processando..." : "Confirmar e pagar"}
           </Button>
         </form>
       </section>
 
+      {/* ─── Summary ─────────────────────────────────────────── */}
       <aside className="h-fit space-y-4 rounded-2xl border bg-white p-5 shadow-sm">
         <h2 className="text-lg font-bold">Resumo do pedido</h2>
         <div className="space-y-3">
-          {items.map((item) => (
-            <div
-              key={item.id}
-              className="flex items-center justify-between gap-3 text-sm"
-            >
+          {cartItems.map((item) => (
+            <div key={`${item.id}-${item.size ?? "un"}`} className="flex items-center justify-between gap-3 text-sm">
               <div>
-                <div className="font-medium">{item.product.name}</div>
-                <div className="text-muted-foreground">
-                  {item.variant?.size ? `${item.variant.size} - ` : ""}
-                  {item.quantity}x {currency(Number(item.price))}
-                </div>
+                <div className="font-medium">{item.title}</div>
+                <div className="text-muted-foreground">{item.size ? `${item.size} · ` : ""}{item.qty}x {currency(item.price)}</div>
               </div>
-              <div className="font-semibold">
-                {currency(Number(item.price) * item.quantity)}
-              </div>
+              <div className="font-semibold">{currency(item.price * item.qty)}</div>
             </div>
           ))}
         </div>
         <Separator />
-
         <div className="space-y-2 text-sm">
           <div className="flex items-center justify-between">
             <span className="text-muted-foreground">Subtotal</span>
@@ -483,21 +463,12 @@ export function CheckoutPageContent() {
           <div className="flex items-center justify-between">
             <span className="text-muted-foreground">Frete</span>
             {selectedShipping ? (
-              <span>
-                {shippingCost === 0 ? (
-                  <span className="font-medium text-green-600">Grátis</span>
-                ) : (
-                  currency(shippingCost)
-                )}
-              </span>
+              <span>{shippingCost === 0 ? <span className="font-medium text-green-600">Grátis</span> : currency(shippingCost)}</span>
             ) : (
-              <span className="text-muted-foreground">
-                {selectedAddressId ? "Selecione o frete" : "Selecione o endereço"}
-              </span>
+              <span className="text-muted-foreground">Selecione o frete</span>
             )}
           </div>
         </div>
-
         <Separator />
         <div className="flex items-center justify-between text-base">
           <span className="font-semibold">Total</span>
