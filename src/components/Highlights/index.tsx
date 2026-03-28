@@ -100,11 +100,11 @@ export const Highlights = () => {
       <GenericCarousel
         items={items}
         itemClassName="
-          basis-[82%]
-          sm:basis-[58%]
-          md:basis-[44%]
-          lg:basis-[34%]
-          xl:basis-[30%]
+          basis-[55%]
+          sm:basis-[38%]
+          md:basis-[30%]
+          lg:basis-[24%]
+          xl:basis-[20%]
         "
         renderItem={(item) => (
           <HighlightCard
@@ -113,7 +113,7 @@ export const Highlights = () => {
             image={item.image}
             subtitle={item.subtitle}
             eyebrow={item.eyebrow}
-            imgAspect="portrait"
+            imgAspect="square"
           />
         )}
       />
