@@ -1,7 +1,8 @@
 /**
- * AbacatePay API v2 client.
+ * AbacatePay API v1 client.
  *
  * Docs: https://docs.abacatepay.com
+ * OpenAPI: https://docs.abacatepay.com/openapi-v1.yaml
  *
  * Required env vars:
  *   ABACATEPAY_API_KEY  – Bearer token for authentication
@@ -10,7 +11,7 @@
  *   ABACATEPAY_WEBHOOK_SECRET – secret param appended to webhook URL for verification
  */
 
-const ABACATEPAY_BASE_URL = "https://api.abacatepay.com/v2";
+const ABACATEPAY_BASE_URL = "https://api.abacatepay.com/v1";
 
 function getApiKey(): string {
   const key = process.env.ABACATEPAY_API_KEY;
@@ -58,72 +59,73 @@ export interface AbacateCustomer {
   email: string;
   name?: string;
   cellphone?: string;
-  taxId?: string; // CPF or CNPJ
+  taxId?: string;
 }
 
-export interface AbacateProduct {
-  externalId: string;
-  name: string;
-  description?: string;
-  price: number; // centavos
-  quantity: number;
-}
+// ─── Customer ────────────────────────────────────────────────────────────────
 
 export interface CreateCustomerInput {
-  email: string;
-  name?: string;
+  name: string;
   cellphone?: string;
+  email: string;
   taxId?: string;
 }
 
 export interface CreateCustomerResponse {
   data: AbacateCustomer;
-  success: boolean;
   error: string | null;
 }
 
-// ─── Checkout (hosted payment page) ──────────────────────────────────────────
+// ─── Billing (cobranças/checkout) ────────────────────────────────────────────
 
-export interface CreateCheckoutInput {
-  customerId: string;
-  items: Array<{
-    productId: string;
-    quantity: number;
-  }>;
+export type BillingFrequency = "ONE_TIME" | "MULTIPLE_PAYMENTS";
+export type BillingMethod = "PIX";
+export type BillingStatus = "PENDING" | "EXPIRED" | "CANCELLED" | "PAID" | "REFUNDED";
+
+export interface BillingProduct {
+  externalId: string;
+  name: string;
+  description?: string;
+  quantity: number;
+  price: number; // centavos
+}
+
+export interface CreateBillingInput {
+  frequency: BillingFrequency;
+  methods: BillingMethod[];
+  products: BillingProduct[];
+  returnUrl?: string;
   completionUrl?: string;
+  customerId?: string;
   metadata?: Record<string, string>;
 }
 
-export interface AbacateCheckout {
+export interface AbacateBilling {
   id: string;
   url: string;
   amount: number;
-  status: "PENDING" | "EXPIRED" | "CANCELLED" | "PAID" | "REFUNDED";
+  status: BillingStatus;
   devMode: boolean;
-  customer: AbacateCustomer;
+  customer?: AbacateCustomer;
+  products: BillingProduct[];
+  frequency: BillingFrequency;
+  methods: BillingMethod[];
+  metadata?: Record<string, string>;
   createdAt: string;
   updatedAt: string;
-  metadata?: Record<string, string>;
 }
 
-export interface CreateCheckoutResponse {
-  data: AbacateCheckout;
-  success: boolean;
+export interface CreateBillingResponse {
+  data: AbacateBilling;
   error: string | null;
 }
 
-// ─── Transparent PIX (QR Code direto) ────────────────────────────────────────
+// ─── PIX QR Code (transparente) ──────────────────────────────────────────────
 
 export interface CreatePixInput {
   amount: number; // centavos
   description?: string;
-  expiresIn?: number; // seconds (default: 3600)
-  customer?: {
-    email: string;
-    name?: string;
-    taxId?: string;
-    cellphone?: string;
-  };
+  expiresIn?: number; // seconds
   metadata?: Record<string, string>;
 }
 
@@ -131,9 +133,9 @@ export interface AbacatePixQrCode {
   id: string;
   amount: number;
   status: "PENDING" | "EXPIRED" | "CANCELLED" | "PAID" | "REFUNDED";
-  brCode: string; // PIX copia-e-cola
+  brCode: string;
   qrCodeUrl?: string;
-  expiresAt: string;
+  expiresAt?: string;
   createdAt: string;
   updatedAt: string;
   metadata?: Record<string, string>;
@@ -141,35 +143,11 @@ export interface AbacatePixQrCode {
 
 export interface CreatePixResponse {
   data: AbacatePixQrCode;
-  success: boolean;
   error: string | null;
 }
 
 export interface CheckPixResponse {
   data: AbacatePixQrCode;
-  success: boolean;
-  error: string | null;
-}
-
-// ─── Product ─────────────────────────────────────────────────────────────────
-
-export interface CreateProductInput {
-  externalId: string;
-  name: string;
-  description?: string;
-  price: number; // centavos
-  currency?: string;
-}
-
-export interface AbacateProductResponse {
-  data: {
-    id: string;
-    externalId: string;
-    name: string;
-    price: number;
-    status: string;
-  };
-  success: boolean;
   error: string | null;
 }
 
@@ -200,59 +178,43 @@ export interface AbacateWebhookEvent {
   };
 }
 
-// ─── API calls ───────────────────────────────────────────────────────────────
+// ─── API calls (v1 endpoints) ────────────────────────────────────────────────
 
-// Customers
+// Customer
 export async function createCustomer(
   input: CreateCustomerInput
 ): Promise<CreateCustomerResponse> {
   return abacateRequest<CreateCustomerResponse>(
     "POST",
-    "/customers/create",
+    "/customer/create",
     input
   );
 }
 
 export async function listCustomers() {
-  return abacateRequest<{ data: AbacateCustomer[] }>("GET", "/customers/list");
+  return abacateRequest<{ data: AbacateCustomer[] }>("GET", "/customer/list");
 }
 
-// Products
-export async function createProduct(
-  input: CreateProductInput
-): Promise<AbacateProductResponse> {
-  return abacateRequest<AbacateProductResponse>(
+// Billing (cobranças com link de pagamento)
+export async function createBilling(
+  input: CreateBillingInput
+): Promise<CreateBillingResponse> {
+  return abacateRequest<CreateBillingResponse>(
     "POST",
-    "/products/create",
+    "/billing/create",
     input
   );
 }
 
-// Checkouts (hosted payment page — PIX + Card)
-export async function createCheckout(
-  input: CreateCheckoutInput
-): Promise<CreateCheckoutResponse> {
-  return abacateRequest<CreateCheckoutResponse>(
-    "POST",
-    "/checkouts/create",
-    input
-  );
+export async function listBillings() {
+  return abacateRequest<{ data: AbacateBilling[] }>("GET", "/billing/list");
 }
 
-export async function getCheckout(
-  checkoutId: string
-): Promise<{ data: AbacateCheckout }> {
-  return abacateRequest<{ data: AbacateCheckout }>(
-    "GET",
-    `/checkouts/get?id=${checkoutId}`
-  );
-}
-
-// Transparent PIX (QR Code direto, sem checkout hospedado)
+// PIX QR Code (transparente)
 export async function createPixQrCode(
   input: CreatePixInput
 ): Promise<CreatePixResponse> {
-  return abacateRequest<CreatePixResponse>("POST", "/transparents/create", input);
+  return abacateRequest<CreatePixResponse>("POST", "/pixQrCode/create", input);
 }
 
 export async function checkPixStatus(
@@ -260,12 +222,12 @@ export async function checkPixStatus(
 ): Promise<CheckPixResponse> {
   return abacateRequest<CheckPixResponse>(
     "GET",
-    `/transparents/check?id=${pixId}`
+    `/pixQrCode/check?id=${pixId}`
   );
 }
 
 export async function simulatePixPayment(pixId: string) {
-  return abacateRequest("POST", "/transparents/simulate-payment", {
+  return abacateRequest("POST", "/pixQrCode/simulate-payment", {
     id: pixId,
   });
 }
@@ -274,11 +236,7 @@ export async function simulatePixPayment(pixId: string) {
 
 /**
  * Verify AbacatePay webhook by checking the secret query parameter.
- *
- * AbacatePay recommends appending a secret to the webhook URL:
- *   https://your-site.com/api/webhooks/abacatepay?secret=YOUR_SECRET
- *
- * This function validates that parameter.
+ * Append ?secret=YOUR_SECRET to the webhook URL when configuring.
  */
 export function verifyWebhookSecret(receivedSecret: string | null): boolean {
   const expected = process.env.ABACATEPAY_WEBHOOK_SECRET;

@@ -4,11 +4,10 @@ import { createClient } from "@/lib/supabase/server";
 import {
   createCustomer,
   createPixQrCode,
-  createCheckout,
-  createProduct,
+  createBilling,
   checkPixStatus,
   type AbacatePixQrCode,
-  type AbacateCheckout,
+  type AbacateBilling,
 } from "@/lib/abacatepay";
 
 interface PixPaymentData {
@@ -16,11 +15,11 @@ interface PixPaymentData {
   expiresIn?: number;
 }
 
-interface CheckoutPaymentData {
-  method: "checkout"; // Hosted checkout (PIX + Card via AbacatePay page)
+interface BillingPaymentData {
+  method: "billing"; // Hosted billing link (PIX via AbacatePay page)
 }
 
-type PaymentData = PixPaymentData | CheckoutPaymentData;
+type PaymentData = PixPaymentData | BillingPaymentData;
 
 export async function createPayment(data: {
   orderId: string;
@@ -58,8 +57,9 @@ export async function createPayment(data: {
 
   const customerEmail = data.customer.email || user.email || "";
   const customerName = data.customer.name || profile?.name || "Cliente";
+  const amountCents = Math.round(Number(order.total) * 100);
 
-  // Create or find customer in AbacatePay
+  // Create customer in AbacatePay
   const customerRes = await createCustomer({
     email: customerEmail,
     name: customerName,
@@ -67,25 +67,17 @@ export async function createPayment(data: {
     cellphone: data.customer.cellphone,
   });
 
-  const abacateCustomerId = customerRes.data.id!;
-  const amountCents = Math.round(Number(order.total) * 100);
-
   let paymentRecord: Record<string, unknown> = {
     order_id: order.id,
     amount_cents: amountCents,
   };
 
   if (data.payment.method === "pix") {
-    // ─── Transparent PIX (QR Code direto) ─────────────────────────────
+    // ─── PIX QR Code (transparente) ───────────────────────────────────
     const pixRes = await createPixQrCode({
       amount: amountCents,
       description: `Pedido #${order.id.slice(0, 8)}`,
       expiresIn: data.payment.expiresIn ?? 3600,
-      customer: {
-        email: customerEmail,
-        name: customerName,
-        taxId: data.customer.taxId,
-      },
       metadata: { order_id: order.id },
     });
 
@@ -99,41 +91,39 @@ export async function createPayment(data: {
       gateway_status: pix.status,
       pix_qr_code: pix.brCode,
       pix_qr_code_url: pix.qrCodeUrl ?? null,
-      pix_expires_at: pix.expiresAt,
+      pix_expires_at: pix.expiresAt ?? null,
       gateway_response: pixRes as unknown as Record<string, unknown>,
     };
   } else {
-    // ─── Hosted Checkout (AbacatePay page — PIX + Card) ───────────────
-    // Ensure products exist in AbacatePay
-    const productIds: string[] = [];
-    for (const item of order.order_items as any[]) {
-      const prodRes = await createProduct({
-        externalId: item.product_id,
-        name: item.product?.name ?? `Produto ${item.product_id.slice(0, 8)}`,
-        price: Math.round(Number(item.unit_price) * 100) * item.quantity,
-      });
-      productIds.push(prodRes.data.id);
-    }
+    // ─── Billing link (página hospedada do AbacatePay) ────────────────
+    const products = (order.order_items as any[]).map((item: any) => ({
+      externalId: item.product_id,
+      name: item.product?.name ?? `Produto ${item.product_id.slice(0, 8)}`,
+      quantity: item.quantity,
+      price: Math.round(Number(item.unit_price) * 100),
+    }));
 
     const completionUrl = `${process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"}/checkout/payment/${order.id}`;
 
-    const checkoutRes = await createCheckout({
-      customerId: abacateCustomerId,
-      items: productIds.map((id) => ({ productId: id, quantity: 1 })),
+    const billingRes = await createBilling({
+      frequency: "ONE_TIME",
+      methods: ["PIX"],
+      products,
       completionUrl,
+      customerId: customerRes.data.id,
       metadata: { order_id: order.id },
     });
 
-    const checkout: AbacateCheckout = checkoutRes.data;
+    const billing: AbacateBilling = billingRes.data;
 
     paymentRecord = {
       ...paymentRecord,
-      method: "credit_card", // checkout supports card + pix
-      status: checkout.status === "PAID" ? "paid" : "waiting_payment",
-      gateway_id: checkout.id,
-      gateway_status: checkout.status,
-      boleto_url: checkout.url, // reuse field to store checkout URL
-      gateway_response: checkoutRes as unknown as Record<string, unknown>,
+      method: "pix",
+      status: billing.status === "PAID" ? "paid" : "waiting_payment",
+      gateway_id: billing.id,
+      gateway_status: billing.status,
+      boleto_url: billing.url, // reuse field for billing link
+      gateway_response: billingRes as unknown as Record<string, unknown>,
     };
   }
 
@@ -152,7 +142,7 @@ export async function createPayment(data: {
     .update({
       payment_id: payment.id,
       gateway_order_id: paymentRecord.gateway_id as string,
-      payment_method: data.payment.method,
+      payment_method: data.payment.method === "pix" ? "pix" : "billing",
       updated_at: new Date().toISOString(),
     })
     .eq("id", order.id);
@@ -193,8 +183,10 @@ export async function getPaymentByOrder(orderId: string) {
       const newStatus = statusRes.data.status;
 
       if (newStatus === "PAID" && data.status !== "paid") {
-        const supabaseAdmin = (await import("@/lib/supabase/admin")).createAdminClient();
-        await supabaseAdmin
+        const { createAdminClient } = await import("@/lib/supabase/admin");
+        const admin = createAdminClient();
+
+        await admin
           .from("payments")
           .update({
             status: "paid",
@@ -203,7 +195,7 @@ export async function getPaymentByOrder(orderId: string) {
           })
           .eq("id", data.id);
 
-        await supabaseAdmin
+        await admin
           .from("orders")
           .update({ status: "paid" })
           .eq("id", orderId)
@@ -213,7 +205,7 @@ export async function getPaymentByOrder(orderId: string) {
         data.paid_at = new Date().toISOString();
       }
     } catch {
-      // Ignore status check errors
+      // Ignore polling errors
     }
   }
 

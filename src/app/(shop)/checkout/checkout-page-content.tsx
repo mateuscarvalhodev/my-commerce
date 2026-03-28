@@ -25,7 +25,7 @@ import { createPayment } from "@/actions/payments";
 import { currency } from "@/utils/currency";
 import { cn } from "@/lib/utils";
 
-type PaymentMethodType = "pix" | "checkout";
+type PaymentMethodType = "pix" | "billing";
 
 const PAYMENT_METHODS: {
   value: PaymentMethodType;
@@ -40,8 +40,8 @@ const PAYMENT_METHODS: {
     description: "QR Code direto, aprovação instantânea",
   },
   {
-    value: "checkout",
-    label: "Cartão / PIX (checkout)",
+    value: "billing",
+    label: "Link de pagamento",
     icon: CreditCard,
     description: "Página segura do AbacatePay",
   },
@@ -173,7 +173,7 @@ export function CheckoutPageContent() {
         return;
       }
 
-      // 2. Create payment via AbacatePay
+      // 2. Create payment via AbacatePay v1
       const paymentInput: any = {
         orderId: order.id,
         customer: {
@@ -182,14 +182,14 @@ export function CheckoutPageContent() {
         payment:
           paymentMethod === "pix"
             ? { method: "pix", expiresIn: 3600 }
-            : { method: "checkout" },
+            : { method: "billing" },
       };
 
       const payment = await createPayment(paymentInput);
 
       // 3. Redirect based on payment method
-      if (paymentMethod === "checkout" && payment?.boleto_url) {
-        // Hosted checkout — redirect to AbacatePay payment page
+      if (paymentMethod === "billing" && payment?.boleto_url) {
+        // Billing link — redirect to AbacatePay payment page
         toast.success("Redirecionando para o pagamento...");
         window.location.href = payment.boleto_url;
       } else {

@@ -20,7 +20,7 @@ All backend logic lives in Server Actions (`src/actions/`) and API Routes (`src/
 - `src/app/api/webhooks/pagarme/` — Pagar.me webhook (public, no auth)
 - `src/app/api/shipping/calculate/` — Shipping calculation endpoint
 - `src/lib/supabase/` — Supabase client helpers (client, server, admin, middleware)
-- `src/lib/abacatepay.ts` — AbacatePay API v2 client
+- `src/lib/abacatepay.ts` — AbacatePay API v1 client
 - `src/lib/shipping.ts` — Correios shipping calculator with fallback
 
 ### Authentication
@@ -37,7 +37,7 @@ Key tables: profiles, products, categories, product_variants, product_images, ca
 
 ### Payments
 
-AbacatePay v2 integration supporting PIX (transparent QR Code) and hosted checkout (PIX + Card). Webhook at `/api/webhooks/abacatepay` with secret query param verification.
+AbacatePay v1 integration supporting PIX QR Code (transparente) and billing links (página hospedada). Webhook at `/api/webhooks/abacatepay` with secret query param verification.
 
 ### Shipping
 
