@@ -1,13 +1,14 @@
 "use client";
 
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { ShoppingBag, SlidersHorizontal, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import CatalogGrid from "@/components/CatalogGrid";
 import { getProducts, getCategories } from "@/actions/products";
+import { mapSupabaseProductToCatalogProduct } from "@/lib/commerce/mappers";
 import { currency } from "@/utils/currency";
 import { cn } from "@/lib/utils";
 
@@ -361,59 +362,10 @@ export function ProductsCatalogPage() {
             </p>
           </div>
 
-          {products.length === 0 ? (
-            <div className="flex flex-col items-center gap-4 py-16 text-center">
-              <ShoppingBag className="size-12 text-muted-foreground/50" />
-              <p className="text-muted-foreground">
-                Nenhum produto encontrado para os filtros atuais.
-              </p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
-              {products.map((product) => {
-                const image =
-                  product.product_images?.find((img) => img.is_primary) ??
-                  product.product_images?.[0];
-                const imageUrl = image?.url ?? product.image_url;
-
-                return (
-                  <Link
-                    key={product.id}
-                    href={`/products/${product.slug}`}
-                    className="group overflow-hidden rounded-2xl border bg-white p-3 shadow-sm transition-shadow hover:shadow-md"
-                  >
-                    <div className="aspect-[4/5] overflow-hidden rounded-xl bg-muted">
-                      {imageUrl ? (
-                        <img
-                          src={imageUrl}
-                          alt={product.name}
-                          className="size-full object-cover transition-transform group-hover:scale-105"
-                        />
-                      ) : (
-                        <div className="flex size-full items-center justify-center">
-                          <ShoppingBag className="size-8 text-muted-foreground/30" />
-                        </div>
-                      )}
-                    </div>
-                    <h3 className="mt-3 text-sm font-semibold line-clamp-2">
-                      {product.name}
-                    </h3>
-                    <div className="mt-2 flex items-baseline gap-2">
-                      <span className="text-base font-black text-primary">
-                        {currency(product.price)}
-                      </span>
-                      {product.compare_at_price &&
-                      product.compare_at_price > product.price ? (
-                        <span className="text-xs text-muted-foreground line-through">
-                          {currency(product.compare_at_price)}
-                        </span>
-                      ) : null}
-                    </div>
-                  </Link>
-                );
-              })}
-            </div>
-          )}
+          <CatalogGrid
+            products={products.map(mapSupabaseProductToCatalogProduct)}
+            emptyMessage="Nenhum produto encontrado para os filtros atuais."
+          />
         </section>
       )}
     </main>
