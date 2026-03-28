@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import { Exo_2, Geist, Geist_Mono } from "next/font/google";
 import { Providers } from "@/components/providers";
-import { Header } from "@/components/layout/header";
+import { AppSidebar } from "@/components/AppSidebar";
+import { Header } from "@/components/Header";
+import { WhatsAppFAB } from "@/components/WhatsappFab";
 import "./globals.css";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
@@ -28,14 +30,16 @@ export default function RootLayout({
 }) {
   return (
     <html lang="pt-BR" className={exo2.variable}>
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased overflow-x-hidden`}>
         <Providers>
           <div className="flex min-h-dvh w-full">
-            <main className="flex-1">
+            <AppSidebar />
+            <main className="flex-1 overflow-x-hidden">
               <Header />
               {children}
             </main>
           </div>
+          <WhatsAppFAB />
         </Providers>
       </body>
     </html>
