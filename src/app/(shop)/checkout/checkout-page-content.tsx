@@ -83,6 +83,7 @@ export function CheckoutPageContent() {
   const [shippingLoading, setShippingLoading] = useState(false);
 
   const [cpf, setCpf] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   // Guest fields
   const [guestEmail, setGuestEmail] = useState("");
@@ -173,17 +174,44 @@ export function CheckoutPageContent() {
   const shippingCost = selectedShipping?.price ?? 0;
   const orderTotal = subtotal + shippingCost;
 
+  function validate(): Record<string, string> {
+    const errors: Record<string, string> = {};
+    const cleanCpf = cpf.replace(/\D/g, "");
+
+    if (cleanCpf.length !== 11 && cleanCpf.length !== 14) {
+      errors.cpf = "Informe um CPF ou CNPJ válido.";
+    }
+
+    if (!selectedShipping) {
+      errors.shipping = "Selecione uma opção de frete.";
+    }
+
+    if (isLoggedIn) {
+      if (!selectedAddressId) {
+        errors.address = "Selecione um endereço de entrega.";
+      }
+    } else {
+      if (!guestEmail.trim()) errors.guestEmail = "Informe seu e-mail.";
+      const cleanCep = guestCep.replace(/\D/g, "");
+      if (cleanCep.length !== 8) errors.guestCep = "Digite um CEP válido.";
+      if (!guestStreet) errors.guestStreet = "Preencha a rua.";
+      if (!guestNumber) errors.guestNumber = "Preencha o número.";
+      if (!guestNeighborhood) errors.guestNeighborhood = "Preencha o bairro.";
+      if (!guestCity) errors.guestCity = "Preencha a cidade.";
+      if (!guestState) errors.guestState = "Preencha o estado.";
+    }
+
+    return errors;
+  }
+
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (!selectedShipping) {
-      toast.error("Selecione uma opção de frete.");
-      return;
-    }
+    const errors = validate();
+    setFieldErrors(errors);
 
-    const cleanCpf = cpf.replace(/\D/g, "");
-    if (cleanCpf.length !== 11 && cleanCpf.length !== 14) {
-      toast.error("Informe um CPF ou CNPJ válido.");
+    if (Object.keys(errors).length > 0) {
+      toast.error("Preencha os campos obrigatórios.");
       return;
     }
 
@@ -192,40 +220,27 @@ export function CheckoutPageContent() {
       return;
     }
 
+    const cleanCpf = cpf.replace(/\D/g, "");
+
     setSubmitting(true);
     try {
       let orderId: string;
       let userId: string | undefined;
 
       if (isLoggedIn) {
-        if (!selectedAddressId) {
-          toast.error("Selecione um endereço de entrega.");
-          setSubmitting(false);
-          return;
-        }
 
         await syncToServer();
 
         const order = await createOrder({
           paymentMethod,
-          shippingAddressId: selectedAddressId,
+          shippingAddressId: selectedAddressId!,
           couponCode: couponCode.trim() || undefined,
-          shippingServiceCode: selectedShipping.service_code,
+          shippingServiceCode: selectedShipping!.service_code,
         });
 
         if (!order?.id) throw new Error("Erro ao criar o pedido.");
         orderId = order.id;
       } else {
-        if (!guestEmail.trim()) {
-          toast.error("Informe seu e-mail.");
-          setSubmitting(false);
-          return;
-        }
-        if (!guestStreet || !guestNumber || !guestNeighborhood || !guestCity || !guestState || !guestCep) {
-          toast.error("Preencha todos os campos do endereço.");
-          setSubmitting(false);
-          return;
-        }
 
         const result = await guestCheckout({
           email: guestEmail.trim(),
@@ -247,7 +262,7 @@ export function CheckoutPageContent() {
           },
           paymentMethod,
           couponCode: couponCode.trim() || undefined,
-          shippingServiceCode: selectedShipping.service_code,
+          shippingServiceCode: selectedShipping!.service_code,
           cpf: cleanCpf,
         });
 
@@ -321,7 +336,8 @@ export function CheckoutPageContent() {
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="grid gap-2">
                   <Label htmlFor="guest-email">E-mail *</Label>
-                  <Input id="guest-email" type="email" required value={guestEmail} onChange={(e) => setGuestEmail(e.target.value)} placeholder="seu@email.com" />
+                  <Input id="guest-email" type="email" value={guestEmail} onChange={(e) => { setGuestEmail(e.target.value); setFieldErrors((p) => ({ ...p, guestEmail: "" })); }} placeholder="seu@email.com" />
+                  {fieldErrors.guestEmail && <p className="text-xs text-destructive">{fieldErrors.guestEmail}</p>}
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="guest-name">Nome</Label>
@@ -337,14 +353,14 @@ export function CheckoutPageContent() {
                   <div className="flex gap-2">
                     <Input
                       value={guestCep}
-                      onChange={(e) => setGuestCep(e.target.value)}
+                      onChange={(e) => { setGuestCep(e.target.value); setFieldErrors((p) => ({ ...p, guestCep: "" })); }}
                       onBlur={handleGuestCepBlur}
                       placeholder="00000-000"
                       maxLength={9}
-                      required
                     />
                     {cepLoading ? <Loader2 className="size-5 animate-spin text-muted-foreground mt-2" /> : null}
                   </div>
+                  {fieldErrors.guestCep && <p className="text-xs text-destructive">{fieldErrors.guestCep}</p>}
                 </div>
                 {guestStreet ? (
                   <>
@@ -362,7 +378,8 @@ export function CheckoutPageContent() {
                     </div>
                     <div className="grid gap-2">
                       <Label>Número *</Label>
-                      <Input value={guestNumber} onChange={(e) => setGuestNumber(e.target.value)} placeholder="123" required />
+                      <Input value={guestNumber} onChange={(e) => { setGuestNumber(e.target.value); setFieldErrors((p) => ({ ...p, guestNumber: "" })); }} placeholder="123" />
+                      {fieldErrors.guestNumber && <p className="text-xs text-destructive">{fieldErrors.guestNumber}</p>}
                     </div>
                     <div className="grid gap-2">
                       <Label>Complemento</Label>
@@ -376,8 +393,9 @@ export function CheckoutPageContent() {
 
           {/* ─── CPF ─────────────────────────────────────────────── */}
           <div className="grid gap-2">
-            <Label htmlFor="cpf">CPF / CNPJ</Label>
-            <Input id="cpf" value={cpf} onChange={(e) => setCpf(e.target.value)} placeholder="000.000.000-00" maxLength={18} />
+            <Label htmlFor="cpf">CPF / CNPJ *</Label>
+            <Input id="cpf" value={cpf} onChange={(e) => { setCpf(e.target.value); setFieldErrors((p) => ({ ...p, cpf: "" })); }} placeholder="000.000.000-00" maxLength={18} />
+            {fieldErrors.cpf && <p className="text-xs text-destructive">{fieldErrors.cpf}</p>}
           </div>
 
           {/* ─── Payment method ──────────────────────────────────── */}
@@ -431,6 +449,7 @@ export function CheckoutPageContent() {
                   ))}
                 </div>
               )}
+              {fieldErrors.address && <p className="text-xs text-destructive">{fieldErrors.address}</p>}
             </div>
           ) : null}
 
@@ -464,8 +483,9 @@ export function CheckoutPageContent() {
               )}
             </div>
           ) : null}
+          {fieldErrors.shipping && <p className="text-xs text-destructive">{fieldErrors.shipping}</p>}
 
-          <Button type="submit" className="w-full" disabled={submitting || !selectedShipping}>
+          <Button type="submit" className="w-full" disabled={submitting}>
             {submitting ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
             {submitting ? "Processando..." : "Confirmar e pagar"}
           </Button>
