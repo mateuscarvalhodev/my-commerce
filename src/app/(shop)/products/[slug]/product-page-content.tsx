@@ -17,6 +17,24 @@ type ProductPageContentProps = {
   slug: string;
 };
 
+type DbColorImage = { id: string; url: string; position: number };
+type DbColorVariant = {
+  id: string;
+  size?: string | null;
+  sku?: string | null;
+  price_delta?: number;
+  stock?: number;
+  is_active?: boolean;
+};
+type DbProductColor = {
+  id: string;
+  name: string;
+  hex: string;
+  position: number;
+  images: DbColorImage[];
+  variants: DbColorVariant[];
+};
+
 type DbProduct = {
   id: string;
   name: string;
@@ -36,6 +54,7 @@ type DbProduct = {
     price_delta?: number;
     stock?: number;
   }[];
+  product_colors?: DbProductColor[];
 };
 
 function ProductPageSkeleton() {
@@ -59,6 +78,7 @@ export function ProductPageContent({ slug }: ProductPageContentProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedImage, setSelectedImage] = useState(0);
+  const [selectedColorId, setSelectedColorId] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -67,7 +87,7 @@ export function ProductPageContent({ slug }: ProductPageContentProps) {
         const { data, error: queryError } = await supabase
           .from("products")
           .select(
-            "*, category:categories(*), images:product_images(*), variants:product_variants(*)"
+            "*, category:categories(*), images:product_images(*), variants:product_variants(*), product_colors(*, images:product_images(*), variants:product_variants(*))"
           )
           .eq("slug", slug)
           .single();
@@ -105,9 +125,30 @@ export function ProductPageContent({ slug }: ProductPageContentProps) {
     );
   }
 
-  const images = (product.images ?? []).map((img) => img.url).filter(Boolean);
-  if (images.length === 0 && product.image_url) {
-    images.push(product.image_url);
+  const productColors = (product.product_colors ?? []).sort(
+    (a, b) => a.position - b.position
+  );
+  const hasColors = productColors.length > 0;
+
+  const activeColor = hasColors
+    ? productColors.find((c) => c.id === selectedColorId) ?? productColors[0]
+    : null;
+
+  // Images: if product has colors, show selected color's images; otherwise legacy
+  const images: string[] = [];
+  if (activeColor && activeColor.images.length > 0) {
+    activeColor.images
+      .sort((a, b) => a.position - b.position)
+      .forEach((img) => {
+        if (img.url) images.push(img.url);
+      });
+  } else {
+    const legacyImages = (product.images ?? []).map((img) => img.url).filter(Boolean);
+    if (legacyImages.length > 0) {
+      images.push(...legacyImages);
+    } else if (product.image_url) {
+      images.push(product.image_url);
+    }
   }
 
   const pixPercent = 10;
@@ -115,17 +156,33 @@ export function ProductPageContent({ slug }: ProductPageContentProps) {
   const installments = 5;
   const installmentValue = product.price / installments;
 
+  // Variants: if color is active, use its variants; otherwise legacy
+  const currentVariants = activeColor
+    ? (activeColor.variants ?? [])
+        .filter((v) => v.is_active !== false)
+        .map((v) => ({
+          id: v.id,
+          size: v.size ?? undefined,
+          color: activeColor.name,
+          priceDelta: v.price_delta ?? 0,
+          stock: v.stock ?? 0,
+        }))
+    : (product.variants ?? []).map((v) => ({
+        id: v.id,
+        size: v.size ?? undefined,
+        color: v.color ?? undefined,
+        priceDelta: v.price_delta ?? 0,
+        stock: v.stock ?? 0,
+      }));
+
   const sizes = Array.from(
-    new Set((product.variants ?? []).map((v) => v.size).filter(Boolean))
+    new Set(currentVariants.map((v) => v.size).filter(Boolean))
   ) as string[];
 
-  const variants = (product.variants ?? []).map((v) => ({
-    id: v.id,
-    size: v.size ?? undefined,
-    color: v.color ?? undefined,
-    priceDelta: v.price_delta ?? 0,
-    stock: v.stock ?? 0,
-  }));
+  function handleColorSelect(colorId: string) {
+    setSelectedColorId(colorId);
+    setSelectedImage(0);
+  }
 
   return (
     <div className="container mx-auto space-y-8 p-4 py-8">
@@ -211,6 +268,31 @@ export function ProductPageContent({ slug }: ProductPageContentProps) {
           ) : null}
           <Separator />
 
+          {hasColors && (
+            <div className="space-y-2">
+              <p className="text-sm font-medium">
+                Cor: <span className="font-normal">{activeColor?.name}</span>
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {productColors.map((color) => (
+                  <button
+                    key={color.id}
+                    type="button"
+                    onClick={() => handleColorSelect(color.id)}
+                    title={color.name}
+                    className={cn(
+                      "h-8 w-8 rounded-full border-2 transition-all",
+                      (activeColor?.id ?? productColors[0]?.id) === color.id
+                        ? "border-primary ring-2 ring-primary/30"
+                        : "border-muted hover:border-foreground/40"
+                    )}
+                    style={{ backgroundColor: color.hex }}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
           <ProductActions
             product={{
               id: product.id,
@@ -222,7 +304,7 @@ export function ProductPageContent({ slug }: ProductPageContentProps) {
               },
             }}
             sizes={sizes}
-            variants={variants}
+            variants={currentVariants}
           />
 
           <WishlistToggle productId={String(product.id)} />

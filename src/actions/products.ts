@@ -17,7 +17,10 @@ export async function getProducts(params?: {
 
   let query = supabase
     .from("products")
-    .select("*, category:categories(*), product_images(*)", { count: "exact" })
+    .select(
+      "*, category:categories(*), product_images(*), product_colors(*, images:product_images(*), variants:product_variants(*))",
+      { count: "exact" }
+    )
     .eq("is_active", true)
     .order("created_at", { ascending: false })
     .range(from, to);
@@ -51,7 +54,7 @@ export async function getProductBySlug(slug: string) {
   const { data, error } = await supabase
     .from("products")
     .select(
-      "*, category:categories(*), product_images(*), product_variants(*)"
+      "*, category:categories(*), product_images(*), product_variants(*), product_colors(*, images:product_images(*), variants:product_variants(*))"
     )
     .eq("slug", slug)
     .single();

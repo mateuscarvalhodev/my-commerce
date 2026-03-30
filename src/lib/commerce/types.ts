@@ -2,10 +2,19 @@ export type ProductVariantOption = {
   id: string;
   size?: string | null;
   color?: string | null;
+  colorId?: string | null;
   sku?: string | null;
   priceDelta: number;
   stock?: number | null;
   isActive: boolean;
+};
+
+export type ProductColorOption = {
+  id: string;
+  name: string;
+  hex: string;
+  images: string[];
+  variants: ProductVariantOption[];
 };
 
 export type CatalogProduct = {
@@ -23,6 +32,7 @@ export type CatalogProduct = {
   stock?: number | null;
   isActive?: boolean;
   variants?: ProductVariantOption[];
+  colors?: ProductColorOption[];
 };
 
 export type CommerceImageSource = {
