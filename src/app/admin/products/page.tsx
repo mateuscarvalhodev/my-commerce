@@ -12,6 +12,7 @@ import {
   updateProduct,
   deleteProduct,
 } from "@/actions/admin";
+import { ProductColorsEditor } from "./product-colors-editor";
 
 interface AdminProduct {
   id: string;
@@ -252,6 +253,12 @@ export default function AdminProductsPage() {
               </Button>
             </div>
           </form>
+
+          {editing && (
+            <div className="mt-6 border-t pt-6">
+              <ProductColorsEditor productId={editing.id} />
+            </div>
+          )}
         </div>
       )}
 

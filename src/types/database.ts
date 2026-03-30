@@ -85,9 +85,19 @@ export interface ProductVariant {
   updated_at: string;
 }
 
-export interface ProductImage {
+export interface ProductColor {
   id: string;
   product_id: string;
+  name: string;
+  hex: string;
+  position: number;
+  created_at: string;
+}
+
+export interface ProductImage {
+  id: string;
+  product_id: string | null;
+  product_color_id: string | null;
   url: string;
   alt: string | null;
   position: number;
