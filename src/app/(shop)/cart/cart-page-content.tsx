@@ -80,7 +80,7 @@ export function CartPageContent() {
                 <div>
                   <div className="truncate font-semibold">{item.title}</div>
                   <div className="text-sm text-muted-foreground">
-                    {item.size ? `Tam: ${item.size}` : "Tamanho padrão"}
+                    {item.size ? `Tam: ${item.size}` : ""}
                   </div>
                 </div>
 

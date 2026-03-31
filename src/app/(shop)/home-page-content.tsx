@@ -17,7 +17,7 @@ function HomeCatalogSkeleton() {
             key={index}
             className="overflow-hidden rounded-2xl border bg-white p-3"
           >
-            <Skeleton className="aspect-[4/5] w-full rounded-xl" />
+            <Skeleton className="aspect-4/5 w-full rounded-xl" />
             <Skeleton className="mt-3 h-4 w-full" />
             <Skeleton className="mt-2 h-4 w-2/3" />
             <Skeleton className="mt-4 h-10 w-full rounded-lg" />
@@ -40,7 +40,9 @@ export function HomePageContent() {
       setLoading(true);
       const { data, error: queryError } = await supabase
         .from("products")
-        .select("*, images:product_images(*)")
+        .select(
+          "*, images:product_images(*), product_variants(*)",
+        )
         .eq("is_active", true)
         .limit(8);
 
@@ -69,11 +71,7 @@ export function HomePageContent() {
       ) : (
         <CatalogGrid
           title="Catalogo"
-          subtitle={
-            error
-              ? error
-              : "Produtos carregados"
-          }
+          subtitle={error ? error : "Produtos carregados"}
           products={products}
           emptyMessage="Nenhum produto retornado."
         />

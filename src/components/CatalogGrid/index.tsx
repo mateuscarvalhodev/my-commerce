@@ -46,6 +46,7 @@ export default function CatalogGrid({
             installments={p.installments}
             pixPercent={p.pixPercent}
             sizes={p.sizes}
+            variants={p.variants}
           />
         ))}
       </div>

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { SidebarTrigger } from "@/components/ui/sidebar";
@@ -51,9 +52,9 @@ function HeaderInner({ showBack, title }: HeaderProps) {
           </div>
 
           <div className="justify-self-center">
-            <span className="font-bold text-lg">
+            <Link href="/" className="font-bold text-lg">
               {displayTitle}
-            </span>
+            </Link>
           </div>
 
           <div className="justify-self-end flex items-center gap-1.5">

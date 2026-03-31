@@ -3,7 +3,9 @@
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { SizeSelector } from "@/components/SizeSelector";
 import { useCart } from "@/context/cart-context";
+import { toast } from "sonner";
 import type { CommerceImageSource } from "@/lib/commerce/types";
 
 type ProductVariant = {
@@ -37,7 +39,19 @@ export function ProductActions({
   const router = useRouter();
   const { addItem } = useCart();
   const hasSizes = sizes.length > 0;
-  const defaultSelected = defaultSize ?? sizes[0] ?? DEFAULT_SIZE;
+
+  const stockBySize = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const v of variants) {
+      const key = v.size ?? v.color ?? "";
+      if (key) map[key] = (map[key] ?? 0) + v.stock;
+    }
+    return map;
+  }, [variants]);
+
+  const firstInStock = sizes.find((s) => (stockBySize[s] ?? 0) > 0);
+  const defaultSelected =
+    defaultSize ?? firstInStock ?? sizes[0] ?? DEFAULT_SIZE;
   const [size, setSize] = useState<string>(defaultSelected);
   const [qty, setQty] = useState<number>(1);
 
@@ -50,10 +64,16 @@ export function ProductActions({
     ? product.price + selectedVariant.priceDelta
     : product.price;
 
-  const disabled = qty < 1 || (hasSizes && !size);
+  const sizeOutOfStock = hasSizes && (stockBySize[size] ?? 0) <= 0;
+  const disabled = qty < 1 || (hasSizes && !size) || sizeOutOfStock;
 
   async function handleBuy() {
     if (disabled) return;
+
+    if (sizeOutOfStock) {
+      toast.error("Tamanho esgotado.");
+      return;
+    }
 
     await addItem({
       id: product.id,
@@ -71,25 +91,13 @@ export function ProductActions({
   return (
     <div className="space-y-4">
       {hasSizes ? (
-        <div className="space-y-2">
-          <p className="text-sm font-medium">Tamanho</p>
-          <div className="flex flex-wrap gap-2">
-            {sizes.map((s) => (
-              <button
-                key={s}
-                type="button"
-                onClick={() => setSize(s)}
-                className={`rounded-full border px-4 py-1.5 text-sm transition-colors ${
-                  size === s
-                    ? "border-primary bg-primary text-primary-foreground"
-                    : "hover:bg-muted"
-                }`}
-              >
-                {s}
-              </button>
-            ))}
-          </div>
-        </div>
+        <SizeSelector
+          value={size}
+          onChange={setSize}
+          sizes={sizes}
+          stockBySize={stockBySize}
+          label="Tamanho"
+        />
       ) : (
         <p className="text-sm text-muted-foreground">Tamanho padrão</p>
       )}

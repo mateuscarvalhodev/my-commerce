@@ -1,7 +1,54 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { calculateShipping } from "@/lib/shipping";
+
+export async function validateCoupon(code: string, subtotal: number) {
+  const admin = createAdminClient();
+
+  const { data: coupon, error } = await admin
+    .from("coupons")
+    .select("*")
+    .eq("code", code.toUpperCase())
+    .eq("is_active", true)
+    .single();
+
+  if (error || !coupon) {
+    return { valid: false, message: "Cupom inválido." };
+  }
+
+  if (coupon.expires_at && new Date(coupon.expires_at) < new Date()) {
+    return { valid: false, message: "Cupom expirado." };
+  }
+
+  if (coupon.max_uses && coupon.uses_count >= coupon.max_uses) {
+    return { valid: false, message: "Cupom esgotado." };
+  }
+
+  if (coupon.min_order_value && subtotal < Number(coupon.min_order_value)) {
+    return {
+      valid: false,
+      message: `Pedido mínimo de R$ ${Number(coupon.min_order_value).toFixed(2)} para este cupom.`,
+    };
+  }
+
+  const discount =
+    coupon.type === "percent"
+      ? subtotal * (Number(coupon.value) / 100)
+      : Number(coupon.value);
+
+  return {
+    valid: true,
+    discount: Math.min(discount, subtotal),
+    type: coupon.type as "percent" | "fixed",
+    value: Number(coupon.value),
+    message:
+      coupon.type === "percent"
+        ? `Cupom de ${Number(coupon.value)}% aplicado!`
+        : `Cupom de R$ ${Number(coupon.value).toFixed(2)} aplicado!`,
+  };
+}
 
 export async function createOrder(data: {
   paymentMethod: string;

@@ -18,7 +18,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { getAddresses } from "@/actions/addresses";
-import { createOrder } from "@/actions/orders";
+import { createOrder, validateCoupon } from "@/actions/orders";
 import { createPayment } from "@/actions/payments";
 import { guestCheckout } from "@/actions/guest-checkout";
 import { useCart } from "@/context/cart-context";
@@ -78,6 +78,9 @@ export function CheckoutPageContent() {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethodType>("pix");
   const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
   const [couponCode, setCouponCode] = useState("");
+  const [couponDiscount, setCouponDiscount] = useState(0);
+  const [couponApplied, setCouponApplied] = useState(false);
+  const [couponLoading, setCouponLoading] = useState(false);
   const [selectedShipping, setSelectedShipping] = useState<ShippingOption | null>(null);
   const [shippingOptions, setShippingOptions] = useState<ShippingOption[]>([]);
   const [shippingLoading, setShippingLoading] = useState(false);
@@ -172,7 +175,38 @@ export function CheckoutPageContent() {
   }
 
   const shippingCost = selectedShipping?.price ?? 0;
-  const orderTotal = subtotal + shippingCost;
+  const orderTotal = subtotal - couponDiscount + shippingCost;
+
+  async function handleApplyCoupon() {
+    const code = couponCode.trim();
+    if (!code) {
+      toast.error("Digite um código de cupom.");
+      return;
+    }
+    setCouponLoading(true);
+    try {
+      const result = await validateCoupon(code, subtotal);
+      if (result.valid && result.discount) {
+        setCouponDiscount(result.discount);
+        setCouponApplied(true);
+        toast.success(result.message);
+      } else {
+        setCouponDiscount(0);
+        setCouponApplied(false);
+        toast.error(result.message);
+      }
+    } catch {
+      toast.error("Erro ao validar cupom.");
+    } finally {
+      setCouponLoading(false);
+    }
+  }
+
+  function handleRemoveCoupon() {
+    setCouponCode("");
+    setCouponDiscount(0);
+    setCouponApplied(false);
+  }
 
   function validate(): Record<string, string> {
     const errors: Record<string, string> = {};
@@ -421,7 +455,23 @@ export function CheckoutPageContent() {
           {/* ─── Coupon ──────────────────────────────────────────── */}
           <div className="grid gap-2">
             <Label htmlFor="coupon-code">Cupom de desconto</Label>
-            <Input id="coupon-code" value={couponCode} onChange={(e) => setCouponCode(e.target.value.toUpperCase())} placeholder="Código do cupom" />
+            {couponApplied ? (
+              <div className="flex items-center justify-between rounded-lg border border-green-300 bg-green-50 p-3 text-sm">
+                <span className="font-medium text-green-700">
+                  {couponCode} — desconto de {currency(couponDiscount)}
+                </span>
+                <Button type="button" variant="ghost" size="sm" onClick={handleRemoveCoupon} className="h-auto p-1 text-xs text-red-500 hover:text-red-700">
+                  Remover
+                </Button>
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                <Input id="coupon-code" value={couponCode} onChange={(e) => setCouponCode(e.target.value.toUpperCase())} placeholder="Código do cupom" />
+                <Button type="button" variant="outline" onClick={handleApplyCoupon} disabled={couponLoading}>
+                  {couponLoading ? <Loader2 className="size-4 animate-spin" /> : "Aplicar"}
+                </Button>
+              </div>
+            )}
           </div>
 
           {/* ─── Address (logged in) ─────────────────────────────── */}
@@ -516,6 +566,12 @@ export function CheckoutPageContent() {
             <span className="text-muted-foreground">Subtotal</span>
             <span>{currency(subtotal)}</span>
           </div>
+          {couponDiscount > 0 && (
+            <div className="flex items-center justify-between">
+              <span className="text-green-600">Cupom ({couponCode})</span>
+              <span className="font-medium text-green-600">- {currency(couponDiscount)}</span>
+            </div>
+          )}
           <div className="flex items-center justify-between">
             <span className="text-muted-foreground">Frete</span>
             {selectedShipping ? (

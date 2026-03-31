@@ -55,7 +55,6 @@ export function ProductsCatalogPage() {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 50000]);
-  const [selectedColors, setSelectedColors] = useState<string[]>([]);
   const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
   const deferredSearch = useDeferredValue(search.trim());
 
@@ -101,17 +100,6 @@ export function ProductsCatalogPage() {
     }
   }, [selectedCategoryId, deferredSearch]);
 
-  // Extract available colors and sizes from all product variants
-  const availableColors = useMemo(() => {
-    const colors = new Set<string>();
-    for (const p of allProducts) {
-      for (const v of p.product_variants ?? []) {
-        if (v.color) colors.add(v.color);
-      }
-    }
-    return Array.from(colors).sort();
-  }, [allProducts]);
-
   const availableSizes = useMemo(() => {
     const sizes = new Set<string>();
     for (const p of allProducts) {
@@ -141,13 +129,6 @@ export function ProductsCatalogPage() {
       (p) => p.price >= priceRange[0] && p.price <= priceRange[1]
     );
 
-    // Color filter
-    if (selectedColors.length > 0) {
-      filtered = filtered.filter((p) =>
-        (p.product_variants ?? []).some((v) => v.color && selectedColors.includes(v.color))
-      );
-    }
-
     // Size filter
     if (selectedSizes.length > 0) {
       filtered = filtered.filter((p) =>
@@ -156,7 +137,7 @@ export function ProductsCatalogPage() {
     }
 
     return filtered;
-  }, [allProducts, deferredSearch, selectedCategoryId, priceRange, selectedColors, selectedSizes]);
+  }, [allProducts, deferredSearch, selectedCategoryId, priceRange, selectedSizes]);
 
   const maxPrice = useMemo(
     () => Math.max(...allProducts.map((p) => p.price), 1000),
@@ -166,19 +147,11 @@ export function ProductsCatalogPage() {
   const hasActiveFilters =
     priceRange[0] > 0 ||
     priceRange[1] < maxPrice ||
-    selectedColors.length > 0 ||
     selectedSizes.length > 0;
 
   function clearFilters() {
     setPriceRange([0, maxPrice]);
-    setSelectedColors([]);
     setSelectedSizes([]);
-  }
-
-  function toggleColor(color: string) {
-    setSelectedColors((prev) =>
-      prev.includes(color) ? prev.filter((c) => c !== color) : [...prev, color]
-    );
   }
 
   function toggleSize(size: string) {
@@ -278,30 +251,6 @@ export function ProductsCatalogPage() {
                   <span>{currency(priceRange[1])}</span>
                 </div>
               </div>
-
-              {/* Colors */}
-              {availableColors.length > 0 && (
-                <div className="space-y-2">
-                  <Label className="text-xs font-semibold">Cor</Label>
-                  <div className="flex flex-wrap gap-1.5">
-                    {availableColors.map((color) => (
-                      <button
-                        key={color}
-                        type="button"
-                        onClick={() => toggleColor(color)}
-                        className={cn(
-                          "rounded-full border px-3 py-1 text-xs transition-colors",
-                          selectedColors.includes(color)
-                            ? "border-primary bg-primary text-primary-foreground"
-                            : "hover:bg-muted"
-                        )}
-                      >
-                        {color}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
 
               {/* Sizes */}
               {availableSizes.length > 0 && (

@@ -170,6 +170,16 @@ export async function createProduct(data: {
   await requireAdmin();
   const admin = createAdminClient();
 
+  // Check for duplicate slug
+  const { count } = await admin
+    .from("products")
+    .select("id", { count: "exact", head: true })
+    .eq("slug", data.slug);
+
+  if (count && count > 0) {
+    throw new Error("SLUG_DUPLICADO");
+  }
+
   const { data: product, error } = await admin
     .from("products")
     .insert({
@@ -238,6 +248,66 @@ export async function deleteProduct(id: string) {
     .single();
 
   if (error) throw new Error(error.message);
+
+  return data;
+}
+
+// ─── Product Variants ─────────────────────────────────────────────────────────
+
+export async function getProductVariants(productId: string) {
+  await requireAdmin();
+  const admin = createAdminClient();
+
+  const { data, error } = await admin
+    .from("product_variants")
+    .select("*")
+    .eq("product_id", productId)
+    .order("size");
+
+  if (error) throw new Error(error.message);
+  return data ?? [];
+}
+
+export async function saveProductVariants(
+  productId: string,
+  variants: { size: string; stock: number }[]
+) {
+  await requireAdmin();
+  const admin = createAdminClient();
+
+  // Delete existing size variants for this product
+  const { error: deleteError } = await admin
+    .from("product_variants")
+    .delete()
+    .eq("product_id", productId)
+    .not("size", "is", null);
+
+  if (deleteError) throw new Error(deleteError.message);
+
+  if (variants.length === 0) return [];
+
+  const shortId = productId.slice(0, 8);
+  const rows = variants.map((v) => ({
+    product_id: productId,
+    size: v.size,
+    sku: `${shortId}-${v.size}`,
+    stock: v.stock,
+    is_active: true,
+  }));
+
+  const { data, error } = await admin
+    .from("product_variants")
+    .insert(rows)
+    .select();
+
+  if (error) throw new Error(error.message);
+
+  // Update product total stock to sum of variant stocks
+  const totalStock = variants.reduce((sum, v) => sum + v.stock, 0);
+  await admin
+    .from("products")
+    .update({ stock: totalStock, updated_at: new Date().toISOString() })
+    .eq("id", productId);
 
   return data;
 }

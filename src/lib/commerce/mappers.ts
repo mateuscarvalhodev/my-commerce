@@ -1,4 +1,4 @@
-import type { CartLineItem, CatalogProduct, ProductColorOption, ProductVariantOption } from "./types";
+import type { CartLineItem, CatalogProduct, ProductVariantOption } from "./types";
 
 export const PRODUCT_IMAGE_FALLBACK = "/product-placeholder.svg";
 const DEFAULT_PIX_PERCENT = 10;
@@ -45,14 +45,11 @@ export function mapSupabaseProductToCatalogProduct(product: any): CatalogProduct
   const title = product.name ?? `Produto ${productId}`;
   const price = Number(product.price) || 0;
 
-  // Legacy direct variants (product_variants with product_id)
-  const legacyVariants: ProductVariantOption[] = (product.variants ?? product.product_variants ?? [])
+  const allVariants: ProductVariantOption[] = (product.variants ?? product.product_variants ?? [])
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .map((v: any) => ({
       id: String(v.id ?? ""),
       size: v.size ?? null,
-      color: v.color ?? null,
-      colorId: v.product_color_id ?? null,
       sku: v.sku ?? null,
       priceDelta: Number(v.price_delta) || 0,
       stock: v.stock != null ? Number(v.stock) : null,
@@ -60,51 +57,11 @@ export function mapSupabaseProductToCatalogProduct(product: any): CatalogProduct
     }))
     .filter((v: ProductVariantOption) => v.id && v.isActive);
 
-  // Color-based structure
-  const rawColors = product.product_colors ?? [];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const colors: ProductColorOption[] = rawColors.map((c: any) => {
-    const colorImages = (c.images ?? [])
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .sort((a: any, b: any) => (Number(a.position) || 0) - (Number(b.position) || 0))
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .map((img: any) => img.url?.trim())
-      .filter((url: string | undefined): url is string => Boolean(url));
-
-    const colorVariants: ProductVariantOption[] = (c.variants ?? [])
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .map((v: any) => ({
-        id: String(v.id ?? ""),
-        size: v.size ?? null,
-        color: c.name ?? null,
-        colorId: String(c.id ?? ""),
-        sku: v.sku ?? null,
-        priceDelta: Number(v.price_delta) || 0,
-        stock: v.stock != null ? Number(v.stock) : null,
-        isActive: v.is_active !== false,
-      }))
-      .filter((v: ProductVariantOption) => v.id && v.isActive);
-
-    return {
-      id: String(c.id ?? ""),
-      name: c.name ?? "",
-      hex: c.hex ?? "#000000",
-      images: colorImages,
-      variants: colorVariants,
-    };
-  });
-
-  // Merge all variants: legacy + color-nested
-  const allVariants = [
-    ...legacyVariants,
-    ...colors.flatMap((c) => c.variants),
-  ];
-
   const sizes = allVariants
-    .map((v) => v.size ?? v.color)
+    .map((v) => v.size)
     .filter((s): s is string => Boolean(s));
 
-  // Build images: main image + legacy product_images + color images
+  // Build images: main image + product_images
   const images: string[] = [];
   const mainImage = product.image_url?.trim();
   if (mainImage) images.push(mainImage);
@@ -120,13 +77,6 @@ export function mapSupabaseProductToCatalogProduct(product: any): CatalogProduct
     if (!images.includes(url)) images.push(url);
   }
 
-  // Add color images
-  for (const color of colors) {
-    for (const url of color.images) {
-      if (!images.includes(url)) images.push(url);
-    }
-  }
-
   return {
     id: productId,
     slug: getProductSlug(title, productId),
@@ -140,7 +90,6 @@ export function mapSupabaseProductToCatalogProduct(product: any): CatalogProduct
     stock: product.stock != null ? Number(product.stock) : null,
     isActive: product.is_active !== false,
     variants: allVariants,
-    colors: colors.length > 0 ? colors : undefined,
   };
 }
 

@@ -12,7 +12,7 @@ import { currency } from "@/utils/currency";
 import { ProductQuickBuyDrawer } from "@/components/QuickbuyDrawer";
 import { useCart } from "@/context/cart-context";
 import { CommerceImage } from "@/components/ui/commerce-image";
-import type { CommerceImageSource } from "@/lib/commerce/types";
+import type { CommerceImageSource, ProductVariantOption } from "@/lib/commerce/types";
 import { WishlistToggle } from "@/components/WishlistToggle";
 
 const PIX_PERCENT_DEFAULT = 10;
@@ -33,6 +33,7 @@ type ProductCardProps = {
   pixPercent?: number;
   loading?: boolean;
   sizes?: string[];
+  variants?: ProductVariantOption[];
 };
 
 export const ProductCard = ({
@@ -49,6 +50,7 @@ export const ProductCard = ({
   pixPercent,
   loading = false,
   sizes,
+  variants,
 }: ProductCardProps) => {
   const isCompact = density === "compact";
   const router = useRouter();
@@ -222,6 +224,7 @@ export const ProductCard = ({
           originalPrice: showOriginal,
         }}
         sizes={sizes}
+        variants={variants}
         onAddToCart={async ({ id: productId, size, qty }) => {
           await addItem({
             id: productId,

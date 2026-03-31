@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { currency } from "@/utils/currency";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -17,7 +17,10 @@ import { toast } from "sonner";
 import { X } from "lucide-react";
 import { SizeSelector } from "../SizeSelector";
 import { CommerceImage } from "@/components/ui/commerce-image";
-import type { CommerceImageSource } from "@/lib/commerce/types";
+import type {
+  CommerceImageSource,
+  ProductVariantOption,
+} from "@/lib/commerce/types";
 
 type Props = {
   open: boolean;
@@ -30,6 +33,7 @@ type Props = {
     originalPrice?: number | null;
   };
   sizes?: string[];
+  variants?: ProductVariantOption[];
   defaultSize?: string;
   onAddToCart?: (args: {
     id: string | number;
@@ -46,14 +50,29 @@ export function ProductQuickBuyDrawer({
   onOpenChange,
   product,
   sizes = [],
+  variants = [],
   defaultSize,
   onAddToCart,
 }: Props) {
   const hasSizes = sizes.length > 0;
-  const defaultSelected = defaultSize ?? sizes[0] ?? DEFAULT_SIZE;
+
+  const stockBySize = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const v of variants) {
+      const key = v.size ?? "";
+      if (key) map[key] = (map[key] ?? 0) + (v.stock ?? 0);
+    }
+    return map;
+  }, [variants]);
+
+  const firstInStock = sizes.find((s) => (stockBySize[s] ?? 0) > 0);
+  const defaultSelected =
+    defaultSize ?? firstInStock ?? sizes[0] ?? DEFAULT_SIZE;
   const [size, setSize] = useState<string>(defaultSelected);
   const [qty, setQty] = useState<number>(1);
-  const disabled = qty < 1 || (hasSizes && !size);
+
+  const sizeOutOfStock = hasSizes && (stockBySize[size] ?? 0) <= 0;
+  const disabled = qty < 1 || (hasSizes && !size) || sizeOutOfStock;
 
   useEffect(() => {
     if (open) {
@@ -64,6 +83,7 @@ export function ProductQuickBuyDrawer({
 
   async function handleBuy() {
     if (disabled) {
+      if (sizeOutOfStock) toast.error("Tamanho esgotado.");
       return;
     }
 
@@ -125,11 +145,14 @@ export function ProductQuickBuyDrawer({
                 </div>
 
                 {hasSizes ? (
-                  <SizeSelector onChange={setSize} value={size} sizes={sizes} />
+                  <SizeSelector
+                    onChange={setSize}
+                    value={size}
+                    sizes={sizes}
+                    stockBySize={stockBySize}
+                  />
                 ) : (
-                  <p className="text-xs font-medium text-muted-foreground">
-                    Tamanho padrao
-                  </p>
+                  <p className="text-xs font-medium text-muted-foreground"></p>
                 )}
               </div>
 
@@ -161,7 +184,9 @@ export function ProductQuickBuyDrawer({
                   type="button"
                   variant="ghost"
                   className="h-10 w-10"
-                  onClick={() => setQty((currentQty) => Math.max(1, currentQty - 1))}
+                  onClick={() =>
+                    setQty((currentQty) => Math.max(1, currentQty - 1))
+                  }
                   aria-label="Diminuir"
                 >
                   -
@@ -173,14 +198,20 @@ export function ProductQuickBuyDrawer({
                   type="button"
                   variant="ghost"
                   className="h-10 w-10"
-                  onClick={() => setQty((currentQty) => Math.min(99, currentQty + 1))}
+                  onClick={() =>
+                    setQty((currentQty) => Math.min(99, currentQty + 1))
+                  }
                   aria-label="Aumentar"
                 >
                   +
                 </Button>
               </div>
 
-              <Button className="h-10 flex-1" onClick={handleBuy} disabled={disabled}>
+              <Button
+                className="h-10 flex-1"
+                onClick={handleBuy}
+                disabled={disabled}
+              >
                 Comprar
               </Button>
             </div>

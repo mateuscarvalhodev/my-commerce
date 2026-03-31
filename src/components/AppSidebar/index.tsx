@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Grid3x3, Layers3, LogIn, X, User, Heart, Package, LogOut } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { getCategorySlug } from "@/lib/commerce/mappers";
 import {
   Sidebar,
   SidebarContent,
@@ -35,60 +34,46 @@ export function AppSidebar() {
     supabase.auth.getUser().then(({ data }) => {
       setIsSignedIn(!!data.user);
     });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setIsSignedIn(!!session?.user);
+    });
+
+    return () => subscription.unsubscribe();
   }, [supabase]);
 
   useEffect(() => {
     supabase
       .from("categories")
       .select("id, name")
+      .order("name")
       .then(({ data }) => {
-        if (data) {
-          setCategories(data);
-        }
+        if (data) setCategories(data);
       });
   }, [supabase]);
 
-  function handleSidebarNavigation() {
-    if (isMobile) {
-      setOpenMobile(false);
-    }
+  function closeSidebar() {
+    if (isMobile) setOpenMobile(false);
   }
 
   async function handleSignOut() {
     await supabase.auth.signOut();
+    closeSidebar();
     router.push("/login");
     router.refresh();
-    if (isMobile) {
-      setOpenMobile(false);
-    }
   }
 
   const categoryItems = categories
-    .map((category) => {
-      const categoryId = String(category.id);
-      const categoryName = category.name;
+    .filter((c) => c.id && c.name)
+    .map((c) => ({
+      title: c.name.toUpperCase(),
+      url: `/products?category=${c.id}`,
+      icon: Layers3,
+    }));
 
-      if (!categoryId || !categoryName) {
-        return null;
-      }
-
-      return {
-        title: categoryName.toUpperCase(),
-        url: `/products?category=${categoryId}`,
-        icon: Layers3,
-      };
-    })
-    .filter(
-      (
-        item
-      ): item is {
-        title: string;
-        url: string;
-        icon: typeof Layers3;
-      } => Boolean(item)
-    );
-
-  const items = [
+  const menuItems = [
     ...categoryItems,
     { title: "TODOS OS PRODUTOS", url: "/products", icon: Grid3x3 },
   ];
@@ -110,7 +95,7 @@ export function AppSidebar() {
               <Link
                 href="/login"
                 className="inline-flex items-center gap-2 font-semibold"
-                onClick={handleSidebarNavigation}
+                onClick={closeSidebar}
               >
                 <LogIn className="size-5" />
                 <span>Entrar</span>
@@ -143,10 +128,10 @@ export function AppSidebar() {
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
-              {items.map((item) => (
+              {menuItems.map((item) => (
                 <SidebarMenuItem key={item.url}>
                   <SidebarMenuButton asChild>
-                    <Link href={item.url} onClick={handleSidebarNavigation}>
+                    <Link href={item.url} onClick={closeSidebar}>
                       <item.icon className="size-4" />
                       <span>{item.title}</span>
                     </Link>
@@ -166,7 +151,7 @@ export function AppSidebar() {
                   {accountItems.map((item) => (
                     <SidebarMenuItem key={item.url}>
                       <SidebarMenuButton asChild>
-                        <Link href={item.url} onClick={handleSidebarNavigation}>
+                        <Link href={item.url} onClick={closeSidebar}>
                           <item.icon className="size-4" />
                           <span>{item.title}</span>
                         </Link>

@@ -6,9 +6,19 @@ function isRemoteImageSource(src: ImageProps["src"]): src is string {
   return typeof src === "string" && /^https?:\/\//.test(src);
 }
 
+function isValidLocalSource(src: ImageProps["src"]): boolean {
+  if (typeof src !== "string") return true; // StaticImport is always valid
+  return src.startsWith("/") || src.startsWith(".");
+}
+
 export function CommerceImage(props: ImageProps) {
-  if (!isRemoteImageSource(props.src)) {
+  if (!isRemoteImageSource(props.src) && isValidLocalSource(props.src)) {
     return <Image {...props} />;
+  }
+
+  if (!isRemoteImageSource(props.src)) {
+    // Invalid src (not remote, not local path) — render fallback
+    return <Image {...props} src="/product-placeholder.svg" />;
   }
 
   const {
