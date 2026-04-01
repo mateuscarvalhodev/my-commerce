@@ -11,6 +11,7 @@ import {
   Package,
   CreditCard,
   QrCode,
+  Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -68,7 +69,7 @@ type ShippingOption = {
 
 export function CheckoutPageContent() {
   const router = useRouter();
-  const { items: cartItems, syncToServer, clear: clearCart, subtotal } = useCart();
+  const { items: cartItems, syncToServer, clear: clearCart, removeItem, subtotal } = useCart();
 
   const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
   const [addresses, setAddresses] = useState<Address[]>([]);
@@ -174,8 +175,10 @@ export function CheckoutPageContent() {
     }
   }
 
+  const PIX_DISCOUNT_PERCENT = 10;
+  const pixDiscount = paymentMethod === "pix" ? subtotal * (PIX_DISCOUNT_PERCENT / 100) : 0;
   const shippingCost = selectedShipping?.price ?? 0;
-  const orderTotal = subtotal - couponDiscount + shippingCost;
+  const orderTotal = subtotal - pixDiscount - couponDiscount + shippingCost;
 
   async function handleApplyCoupon() {
     const code = couponCode.trim();
@@ -552,11 +555,21 @@ export function CheckoutPageContent() {
         <div className="space-y-3">
           {cartItems.map((item) => (
             <div key={`${item.id}-${item.size ?? "un"}`} className="flex items-center justify-between gap-3 text-sm">
-              <div>
-                <div className="font-medium">{item.title}</div>
+              <div className="min-w-0 flex-1">
+                <div className="font-medium truncate">{item.title}</div>
                 <div className="text-muted-foreground">{item.size ? `${item.size} · ` : ""}{item.qty}x {currency(item.price)}</div>
               </div>
-              <div className="font-semibold">{currency(item.price * item.qty)}</div>
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="font-semibold">{currency(item.price * item.qty)}</span>
+                <button
+                  type="button"
+                  onClick={() => removeItem(item.id, item.size)}
+                  className="rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+                  aria-label={`Remover ${item.title}`}
+                >
+                  <Trash2 className="size-3.5" />
+                </button>
+              </div>
             </div>
           ))}
         </div>
@@ -566,6 +579,12 @@ export function CheckoutPageContent() {
             <span className="text-muted-foreground">Subtotal</span>
             <span>{currency(subtotal)}</span>
           </div>
+          {pixDiscount > 0 && (
+            <div className="flex items-center justify-between">
+              <span className="text-green-600">Desconto PIX ({PIX_DISCOUNT_PERCENT}%)</span>
+              <span className="font-medium text-green-600">- {currency(pixDiscount)}</span>
+            </div>
+          )}
           {couponDiscount > 0 && (
             <div className="flex items-center justify-between">
               <span className="text-green-600">Cupom ({couponCode})</span>

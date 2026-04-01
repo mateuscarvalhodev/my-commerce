@@ -12,6 +12,8 @@ import { WishlistToggle } from "@/components/WishlistToggle";
 import { currency } from "@/utils/currency";
 import { cn } from "@/lib/utils";
 import { ProductActions } from "./product-actions";
+import CatalogGrid from "@/components/CatalogGrid";
+import { mapSupabaseProductToCatalogProduct } from "@/lib/commerce/mappers";
 
 type ProductPageContentProps = {
   slug: string;
@@ -58,6 +60,8 @@ export function ProductPageContent({ slug }: ProductPageContentProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedImage, setSelectedImage] = useState(0);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [relatedProducts, setRelatedProducts] = useState<any[]>([]);
 
   useEffect(() => {
     async function load() {
@@ -77,6 +81,21 @@ export function ProductPageContent({ slug }: ProductPageContentProps) {
         }
 
         setProduct(data as unknown as DbProduct);
+
+        // Fetch related products (same category, excluding current)
+        let relatedQuery = supabase
+          .from("products")
+          .select("*, images:product_images(*), product_variants(*)")
+          .eq("is_active", true)
+          .neq("id", data.id)
+          .limit(4);
+
+        if (data.category_id) {
+          relatedQuery = relatedQuery.eq("category_id", data.category_id);
+        }
+
+        const { data: related } = await relatedQuery;
+        setRelatedProducts(related ?? []);
       } catch {
         setError("Não foi possível carregar o produto");
       } finally {
@@ -235,6 +254,13 @@ export function ProductPageContent({ slug }: ProductPageContentProps) {
       <Separator />
 
       <ProductReviews productId={String(product.id)} />
+
+      {relatedProducts.length > 0 && (
+        <CatalogGrid
+          products={relatedProducts.map(mapSupabaseProductToCatalogProduct)}
+          title="Você também pode gostar"
+        />
+      )}
     </div>
   );
 }

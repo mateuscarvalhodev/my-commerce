@@ -71,7 +71,8 @@ export function ProductQuickBuyDrawer({
   const [size, setSize] = useState<string>(defaultSelected);
   const [qty, setQty] = useState<number>(1);
 
-  const sizeOutOfStock = hasSizes && (stockBySize[size] ?? 0) <= 0;
+  const currentStock = hasSizes ? (stockBySize[size] ?? 0) : null;
+  const sizeOutOfStock = hasSizes && currentStock !== null && currentStock <= 0;
   const disabled = qty < 1 || (hasSizes && !size) || sizeOutOfStock;
 
   useEffect(() => {
@@ -145,12 +146,23 @@ export function ProductQuickBuyDrawer({
                 </div>
 
                 {hasSizes ? (
-                  <SizeSelector
-                    onChange={setSize}
-                    value={size}
-                    sizes={sizes}
-                    stockBySize={stockBySize}
-                  />
+                  <div className="space-y-1">
+                    <SizeSelector
+                      onChange={setSize}
+                      value={size}
+                      sizes={sizes}
+                      stockBySize={stockBySize}
+                    />
+                    {currentStock !== null &&
+                      currentStock > 0 &&
+                      currentStock <= 3 && (
+                        <p className="text-[10px] font-semibold text-amber-600">
+                          {currentStock === 1
+                            ? "Última unidade!"
+                            : `Restam ${currentStock} unidades.`}
+                        </p>
+                      )}
+                  </div>
                 ) : (
                   <p className="text-xs font-medium text-muted-foreground"></p>
                 )}

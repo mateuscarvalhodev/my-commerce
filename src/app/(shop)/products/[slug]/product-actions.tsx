@@ -64,7 +64,8 @@ export function ProductActions({
     ? product.price + selectedVariant.priceDelta
     : product.price;
 
-  const sizeOutOfStock = hasSizes && (stockBySize[size] ?? 0) <= 0;
+  const currentStock = hasSizes ? (stockBySize[size] ?? 0) : null;
+  const sizeOutOfStock = hasSizes && currentStock !== null && currentStock <= 0;
   const disabled = qty < 1 || (hasSizes && !size) || sizeOutOfStock;
 
   async function handleBuy() {
@@ -91,13 +92,22 @@ export function ProductActions({
   return (
     <div className="space-y-4">
       {hasSizes ? (
-        <SizeSelector
-          value={size}
-          onChange={setSize}
-          sizes={sizes}
-          stockBySize={stockBySize}
-          label="Tamanho"
-        />
+        <div className="space-y-2">
+          <SizeSelector
+            value={size}
+            onChange={setSize}
+            sizes={sizes}
+            stockBySize={stockBySize}
+            label="Tamanho"
+          />
+          {currentStock !== null && currentStock > 0 && currentStock <= 3 && (
+            <p className="text-xs font-semibold text-amber-600">
+              {currentStock === 1
+                ? "Última unidade disponível!"
+                : `Restam apenas ${currentStock} unidades`}
+            </p>
+          )}
+        </div>
       ) : (
         <p className="text-sm text-muted-foreground">Tamanho padrão</p>
       )}
