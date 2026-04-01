@@ -5,6 +5,8 @@ import { Providers } from "@/components/providers";
 import { AppSidebar } from "@/components/AppSidebar";
 import { Header } from "@/components/Header";
 import { WhatsAppFAB } from "@/components/WhatsappFab";
+import { Footer } from "@/components/Footer";
+import { CookieConsent } from "@/components/CookieConsent";
 import "./globals.css";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
@@ -40,8 +42,10 @@ export default function RootLayout({
                 <Header />
               </Suspense>
               {children}
+              <Footer />
             </main>
           </div>
+          <CookieConsent />
           <WhatsAppFAB />
         </Providers>
       </body>
