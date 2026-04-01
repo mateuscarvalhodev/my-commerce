@@ -18,7 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { getAddresses } from "@/actions/addresses";
+import { getAddresses, createAddress } from "@/actions/addresses";
 import { createOrder, validateCoupon } from "@/actions/orders";
 import { createPayment } from "@/actions/payments";
 import { guestCheckout } from "@/actions/guest-checkout";
@@ -100,6 +100,69 @@ export function CheckoutPageContent() {
   const [guestState, setGuestState] = useState("");
   const [guestCep, setGuestCep] = useState("");
 
+  // New address form (logged-in users)
+  const [showNewAddress, setShowNewAddress] = useState(false);
+  const [newCep, setNewCep] = useState("");
+  const [newStreet, setNewStreet] = useState("");
+  const [newNumber, setNewNumber] = useState("");
+  const [newComplement, setNewComplement] = useState("");
+  const [newNeighborhood, setNewNeighborhood] = useState("");
+  const [newCity, setNewCity] = useState("");
+  const [newState, setNewState] = useState("");
+  const [newCepLoading, setNewCepLoading] = useState(false);
+  const [savingAddress, setSavingAddress] = useState(false);
+
+  async function handleNewCepBlur() {
+    const clean = newCep.replace(/\D/g, "");
+    if (clean.length !== 8) return;
+    setNewCepLoading(true);
+    try {
+      const res = await fetch(`https://viacep.com.br/ws/${clean}/json/`);
+      if (res.ok) {
+        const data = await res.json();
+        if (!data.erro) {
+          setNewStreet(data.logradouro || "");
+          setNewNeighborhood(data.bairro || "");
+          setNewCity(data.localidade || "");
+          setNewState(data.uf || "");
+        }
+      }
+    } catch {} finally {
+      setNewCepLoading(false);
+    }
+  }
+
+  async function handleSaveNewAddress() {
+    const clean = newCep.replace(/\D/g, "");
+    if (clean.length !== 8) { toast.error("CEP inválido."); return; }
+    if (!newStreet || !newNumber || !newNeighborhood || !newCity || !newState) {
+      toast.error("Preencha todos os campos do endereço.");
+      return;
+    }
+    setSavingAddress(true);
+    try {
+      const addr = await createAddress({
+        street: newStreet,
+        number: newNumber,
+        complement: newComplement || undefined,
+        neighborhood: newNeighborhood,
+        city: newCity,
+        state: newState,
+        zip_code: clean,
+      });
+      setAddresses((prev) => [addr as Address, ...prev]);
+      handleAddressSelect((addr as Address).id);
+      setShowNewAddress(false);
+      setNewCep(""); setNewStreet(""); setNewNumber(""); setNewComplement("");
+      setNewNeighborhood(""); setNewCity(""); setNewState("");
+      toast.success("Endereço salvo!");
+    } catch {
+      toast.error("Erro ao salvar endereço.");
+    } finally {
+      setSavingAddress(false);
+    }
+  }
+
   useEffect(() => {
     async function load() {
       const supabase = createClient();
@@ -153,6 +216,25 @@ export function CheckoutPageContent() {
     await fetchShipping(clean);
   }
 
+  function resolveCity(cep: string): string | null {
+    const clean = cep.replace(/\D/g, "");
+    // Check logged-in addresses
+    const addr = addresses.find((a) => a.zip_code.replace(/\D/g, "") === clean);
+    if (addr) return addr.city;
+    // Check guest fields
+    if (guestCep.replace(/\D/g, "") === clean && guestCity) return guestCity;
+    // Check new address form
+    if (newCep.replace(/\D/g, "") === clean && newCity) return newCity;
+    return null;
+  }
+
+  const MOTOBOY_OPTION: ShippingOption = {
+    service_code: "motoboy",
+    service_name: "Motoboy (Fortaleza)",
+    price: 0,
+    deadline_days: 1,
+  };
+
   async function fetchShipping(cep: string) {
     setShippingLoading(true);
     setSelectedShipping(null);
@@ -168,7 +250,15 @@ export function CheckoutPageContent() {
       });
       if (res.ok) {
         const data = await res.json();
-        setShippingOptions(data.options ?? []);
+        const options: ShippingOption[] = data.options ?? [];
+
+        const city = resolveCity(cep);
+        const isFortaleza = city?.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase() === "fortaleza";
+        if (isFortaleza) {
+          options.unshift(MOTOBOY_OPTION);
+        }
+
+        setShippingOptions(options);
       }
     } catch {} finally {
       setShippingLoading(false);
@@ -501,6 +591,58 @@ export function CheckoutPageContent() {
                     </button>
                   ))}
                 </div>
+              )}
+              {/* New address form */}
+              {showNewAddress ? (
+                <div className="space-y-3 rounded-xl border bg-muted/30 p-4">
+                  <p className="text-sm font-semibold">Novo endereço</p>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="grid gap-2 sm:col-span-2">
+                      <Label>CEP *</Label>
+                      <div className="flex gap-2">
+                        <Input value={newCep} onChange={(e) => setNewCep(e.target.value)} onBlur={handleNewCepBlur} placeholder="00000-000" maxLength={9} />
+                        {newCepLoading ? <Loader2 className="mt-2 size-5 animate-spin text-muted-foreground" /> : null}
+                      </div>
+                    </div>
+                    {newStreet && (
+                      <>
+                        <div className="grid gap-2 sm:col-span-2">
+                          <Label>Rua</Label>
+                          <Input value={newStreet} readOnly className="bg-muted/50" />
+                        </div>
+                        <div className="grid gap-2">
+                          <Label>Bairro</Label>
+                          <Input value={newNeighborhood} readOnly className="bg-muted/50" />
+                        </div>
+                        <div className="grid gap-2">
+                          <Label>Cidade / UF</Label>
+                          <Input value={`${newCity} / ${newState}`} readOnly className="bg-muted/50" />
+                        </div>
+                        <div className="grid gap-2">
+                          <Label>Número *</Label>
+                          <Input value={newNumber} onChange={(e) => setNewNumber(e.target.value)} placeholder="123" />
+                        </div>
+                        <div className="grid gap-2">
+                          <Label>Complemento</Label>
+                          <Input value={newComplement} onChange={(e) => setNewComplement(e.target.value)} placeholder="Apto, bloco..." />
+                        </div>
+                      </>
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    <Button type="button" size="sm" onClick={handleSaveNewAddress} disabled={savingAddress}>
+                      {savingAddress ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
+                      Salvar endereço
+                    </Button>
+                    <Button type="button" variant="outline" size="sm" onClick={() => setShowNewAddress(false)}>
+                      Cancelar
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <Button type="button" variant="outline" size="sm" onClick={() => setShowNewAddress(true)}>
+                  <MapPin className="mr-2 size-4" /> Adicionar novo endereço
+                </Button>
               )}
               {fieldErrors.address && <p className="text-xs text-destructive">{fieldErrors.address}</p>}
             </div>
